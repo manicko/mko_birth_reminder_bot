@@ -178,7 +178,10 @@ cython_debug/
 
 *config.yaml
 /logs/*
+/tmp/*
 
+*.csv
 *credentials.json
 *token.json
 *.session*
+*.db

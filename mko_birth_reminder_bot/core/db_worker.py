@@ -1,6 +1,5 @@
 import sqlite3
-from symtable import Class
-from typing import List, Tuple, Optional, Any, Dict, Literal
+from typing import List, Tuple, Optional, Any, Dict, Literal, Union
 from datetime import datetime
 from pathlib import Path
 
@@ -20,6 +19,8 @@ class DBWorker:
         self.logger = logger
         self.db_con = self._db_connect()
 
+        self.db_con.row_factory = sqlite3.Row
+
     def _db_connect(self):
         """Подключается к базе данных SQLite."""
         try:
@@ -32,16 +33,19 @@ class DBWorker:
             raise e
 
     def perform_query(
-            self, query: str, term: Optional[Tuple] = tuple(), fetch: Literal['all', 'one', None] = None,
-            raise_exceptions=True
-    ) -> Optional[List[Tuple[Any, ...]]]:
+            self,
+            query: str,
+            term: Optional[Tuple] = tuple(),
+            fetch: Literal['all', 'one', None] = None,
+            raise_exceptions: bool = False
+    ) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
         """Выполняет SQL-запрос.
 
         :param query: SQL-запрос.
         :param term: Параметры для запроса.
-        :param fetch: Literal['all', 'one', None].
+        :param fetch: Literal['all', 'one', None] - какой тип результата возвращать.
         :param raise_exceptions: Поднимать ли исключения при ошибках.
-        :return: Результаты запроса (если fetch=True).
+        :return: Результаты запроса в виде строки или списка строк.
         """
         cursor = self.db_con.cursor()
         try:
@@ -54,10 +58,10 @@ class DBWorker:
                 case _:
                     result = None
             self.db_con.commit()
-            self.logger.info(f"Запрос выполнен: {query, term}")
+            self.logger.info(f"Запрос выполнен: {query}, параметры: {term}, результат: {result}")
             return result
         except sqlite3.Error as err:
-            self.logger.error(f"Ошибка при выполнении запроса: '{query}' {err}")
+            self.logger.error(f"Ошибка при выполнении запроса: '{query}' с параметрами {term}. Ошибка: {err}")
             if raise_exceptions:
                 raise
         finally:
@@ -122,8 +126,8 @@ class TGUserData(DBWorker):
         :return: Список данных.
         """
         # Преобразуем входные даты в объекты datetime
-        start_date = datetime.strptime(start_date, "%d/%m/%Y")
-        end_date = datetime.strptime(end_date, "%d/%m/%Y")
+        start_date = datetime.strptime(start_date, self.db_settings["date_format"])
+        end_date = datetime.strptime(end_date, self.db_settings["date_format"])
         # Извлекаем месяц и день
         start_month_day = (start_date.month, start_date.day)
         end_month_day = (end_date.month, end_date.day)
@@ -147,7 +151,7 @@ class TGUserData(DBWorker):
                 f"{end_month_day[0]:02d}-{end_month_day[1]:02d}",
             )
 
-        return self.perform_query(query, params, fetch=True)
+        return self.perform_query(query, params, fetch='all')
 
     def add_data(self, prepared_data, sql_loader_settings: Optional[Dict[str, Any]] = None) -> int:
         """Добавляет данные в таблицу."""
@@ -186,13 +190,16 @@ class TGUser(DBWorker):
         'notify_before_days': 'INTEGER',
     }
 
-    def __init__(self, config: ConfigReader, logger: Logger, tg_user_id:int):
+    def __init__(self, config: ConfigReader, logger: Logger, tg_user_id: int):
         super().__init__(config, logger)
-        self.tg_user_id = int(tg_user_id)
-        self._last_interaction_date = self._get_last_interaction_date()
+        self._tg_user_id = int(tg_user_id)
+        self._info = self.get_info()
+        self._last_interaction_date = self._info['last_interaction_date']
+        self._notify_before_days = self._info['notify_before_days']
 
-        self._notify_before_days = self._get_notify_before_days()
-
+    @property
+    def tg_user_id(self):
+        return self._tg_user_id
 
     @property
     def notify_before_days(self):
@@ -202,50 +209,72 @@ class TGUser(DBWorker):
     def notify_before_days(self, notify_before_days: int):
         try:
             self._notify_before_days = int(notify_before_days)
+            self._update_field('notify_before_days', self._notify_before_days)
         except ValueError:
             self.logger.error(f"Неверный формат данных {notify_before_days}. "
                               f"Количество дней должно быть целым числом.")
-
-    def _get_notify_before_days(self):
-        query = (f"SELECT notify_before_days FROM {TGUser.TABLE_NAME}"
-                 f" WHERE tg_user_id = ?")
-        return self.perform_query(query, (self.tg_user_id,), fetch='one')
 
     @property
     def last_interaction_date(self):
         return self._last_interaction_date
 
-    def _get_last_interaction_date(self):
-        query = (f"SELECT last_interaction_date FROM {TGUser.TABLE_NAME}"
-                 f" WHERE tg_user_id = ?")
-        return self.perform_query(query, (self.tg_user_id,), fetch='one')
-
-    def get_info(self) -> Optional[Tuple[Any, ...]]:
+    def _get_field(self, field_name: str) -> Any:
         """
-        Проверяет наличие строки в базе данных по tg_user_id и возвращает эту строку.
-        :return: Кортеж с данными строки, если строка найдена. None, если строки нет.
-        """
-        query = f"SELECT * FROM {TGUser.TABLE_NAME} WHERE tg_user_id = ?"
-        return self.perform_query(query, (self.tg_user_id,), fetch='one')
+        Извлекает значение указанного поля для пользователя.
 
-    def add_data_table(self):
-        self.create_table(f'id_{str(self.tg_user_id)}', TGUser.TABLE_FIELDS)
+        :param field_name: Название столбца, значение которого нужно получить.
+        :return: Значение указанного поля или None, если данных нет.
+        """
+        if field_name not in TGUser.TABLE_FIELDS:
+            self.logger.error(f"Попытка получить недопустимое поле: {field_name}")
+            return None
+
+        query = f"SELECT {field_name} FROM {TGUser.TABLE_NAME} WHERE tg_user_id = ?"
+        result = self.perform_query(query, (self._tg_user_id,), fetch='one')
+        return result[field_name]
+
+    def _update_field(self, field_name: str, field_value: Any) -> None:
+        """
+        Обновляет значение поля в базе данных для текущего пользователя.
+
+        :param field_name: Название столбца, который нужно обновить.
+        :param field_value: Новое значение для столбца.
+        :return: True, если обновление прошло успешно, иначе False.
+        """
+        if field_name not in TGUser.TABLE_FIELDS:
+            self.logger.error(f"Попытка обновить недопустимое поле: {field_name}")
+            return None
+        query = f"""UPDATE {TGUser.TABLE_NAME} SET {field_name} = ? WHERE tg_user_id = ?"""
+        return self.perform_query(query, (field_value, self._tg_user_id), fetch=None)
+
+    def update_last_interaction_date(self):
+        self._last_interaction_date = datetime.now().strftime(self.db_settings["date_format"])
+        self._update_field('last_interaction_date', self._last_interaction_date)
 
     def add_info(self) -> None:
         """
         Добавляет строку с данными пользователя в таблицу.
-
-        :param user_data: Словарь, где ключи - название поля таблицы, значение поля.
-        """
+       """
         # SQL-запрос для вставки данных
         query = f"""INSERT INTO {TGUser.TABLE_NAME} 
                      (tg_user_id, last_interaction_date, notify_before_days)
                      VALUES (?, ?, ?)
                 """
-        self.perform_query(query, (self.tg_user_id, self.last_interaction_date, self.notify_before_days))
+        self.perform_query(query, (self._tg_user_id, self.last_interaction_date, self.notify_before_days))
 
+    def get_info(self) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
+        """
+        Проверяет наличие строки в базе данных по tg_user_id и возвращает эту строку.
+        :return: Кортеж с данными строки, если строка найдена. None, если строки нет.
+        """
+        query = f"SELECT * FROM {TGUser.TABLE_NAME} WHERE tg_user_id = ?"
+        return self.perform_query(query, (self._tg_user_id,), fetch='one')
+
+    def add_data_table(self):
+        """
+        Добавляет в базу таблицу для загрузки данных пользователя.
+       """
+        self.create_table(f'id_{str(self._tg_user_id)}', TGUser.TABLE_FIELDS)
 
     def del_info(self):
         pass
-
-

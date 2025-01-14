@@ -17,6 +17,7 @@ class CSVWorker:
 
         self.data_column_names = self.config.db_settings["column_names"]
         self.date_column = self.config.db_settings["date_column"]
+        self.date_format = self.config.db_settings["date_format"]
 
         self.import_path = Path(self.config.csv_settings["READ_DATA"]["path"])
         self.reader_settings = self.config.csv_settings["READ_DATA"]["from_csv"]
@@ -72,7 +73,7 @@ class CSVWorker:
                                     f"Строка пропущена.")
             else:
                 # Преобразуем дату в формат dd/mm/yyyy
-                row[date_column] = res.strftime("%d/%m/%Y")
+                row[date_column] = res.strftime(self.date_format)
                 valid_rows.append(row)
         return pd.DataFrame(valid_rows)
 
