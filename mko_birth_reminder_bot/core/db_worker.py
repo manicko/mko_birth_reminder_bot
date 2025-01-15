@@ -171,7 +171,14 @@ class TGUserData(DBWorker):
                     WHERE 
                   (strftime('%m-%d', {self.date_column}) = strftime('%m-%d', DATE(?, '+' || {self.notice_before_days_column} || ' days')))
                 """
-
+        """
+        #    SELECT * FROM {self.data_tbl_name}
+        #    WHERE 
+        #        (strftime('%m-%d', DATE({self.date_column})) BETWEEN strftime('%m-%d', ?) AND strftime('%m-%d', ?))
+        #        OR 
+        #        (strftime('%m-%d', DATE({self.date_column})) < strftime('%m-%d', ?) AND strftime('%m-%d', ?) < strftime('%m-%d', ?))
+        #    """
+        # cursor.execute(query, (start_date, end_date, end_date, start_date, end_date))
         return self.perform_query(query, (current_date,),fetch='all')
 
 
