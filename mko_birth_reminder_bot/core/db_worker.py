@@ -116,6 +116,8 @@ class TGUserData(DBWorker):
         self.columns = self.db_settings['columns']
         self.column_names = list(self.columns.keys())
         self.date_column = self.db_settings['date_column']
+        self.notice_before_days_column = self.db_settings['notice_before_days']
+        self.date_format = self.db_settings["date_format"] # %d/%m/%y
         self.data_tbl_name = data_tbl_name
 
     def get_data_in_dates_interval(self, start_date: str, end_date: str) -> List[Tuple[Any, ...]]:
@@ -126,8 +128,8 @@ class TGUserData(DBWorker):
         :return: Список данных.
         """
         # Преобразуем входные даты в объекты datetime
-        start_date = datetime.strptime(start_date, self.db_settings["date_format"])
-        end_date = datetime.strptime(end_date, self.db_settings["date_format"])
+        start_date = datetime.strptime(start_date, self.date_format)
+        end_date = datetime.strptime(end_date, self.date_format)
         # Извлекаем месяц и день
         start_month_day = (start_date.month, start_date.day)
         end_month_day = (end_date.month, end_date.day)
@@ -152,6 +154,26 @@ class TGUserData(DBWorker):
             )
 
         return self.perform_query(query, params, fetch='all')
+
+    def get_upcoming_birthdays(self, current_date=None):
+        """
+        Fetch users whose birthdays match their 'notice_before' days from the current date.
+
+        :param connection: SQLite database connection object.
+        :param current_date: Optional, current date as a string in 'YYYY-MM-DD' format. Defaults to today.
+        :return: List of users with matching birthdays.
+        """
+        if current_date is None:
+            current_date = datetime.now().strftime(self.date)
+
+        today = datetime.strptime(current_date, self.date_format)
+        query = f"""SELECT * FROM {self.data_tbl_name}
+                    WHERE 
+                  (strftime('%m-%d', {self.date_column}) = strftime('%m-%d', DATE(?, '+' || {self.notice_before_days_column} || ' days')))
+                """
+
+        return self.perform_query(query, (current_date,),fetch='all')
+
 
     def add_data(self, prepared_data, sql_loader_settings: Optional[Dict[str, Any]] = None) -> int:
         """Добавляет данные в таблицу."""
@@ -194,8 +216,12 @@ class TGUser(DBWorker):
         super().__init__(config, logger)
         self._tg_user_id = int(tg_user_id)
         self._info = self.get_info()
-        self._last_interaction_date = self._info['last_interaction_date']
-        self._notify_before_days = self._info['notify_before_days']
+        if self._info:
+            self._last_interaction_date = self._info['last_interaction_date']
+            self._notify_before_days = self._info['notify_before_days']
+        else:
+            self._last_interaction_date = None
+            self._notify_before_days = 0
 
     @property
     def tg_user_id(self):
@@ -248,12 +274,13 @@ class TGUser(DBWorker):
         return self.perform_query(query, (field_value, self._tg_user_id), fetch=None)
 
     def update_last_interaction_date(self):
-        self._last_interaction_date = datetime.now().strftime(self.db_settings["date_format"])
+        self._last_interaction_date = datetime.now().strftime(self.date_format)
         self._update_field('last_interaction_date', self._last_interaction_date)
 
     def add_info(self) -> None:
         """
-        Добавляет строку с данными пользователя в таблицу.
+        Добавляет строку с информацией о пользователе в таблицу пользователей
+        и создает пустую таблицу в базе для данных загружаемых пользователем.
        """
         # SQL-запрос для вставки данных
         query = f"""INSERT INTO {TGUser.TABLE_NAME} 
@@ -261,6 +288,7 @@ class TGUser(DBWorker):
                      VALUES (?, ?, ?)
                 """
         self.perform_query(query, (self._tg_user_id, self.last_interaction_date, self.notify_before_days))
+        self.add_data_table()
 
     def get_info(self) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
         """
@@ -277,4 +305,10 @@ class TGUser(DBWorker):
         self.create_table(f'id_{str(self._tg_user_id)}', TGUser.TABLE_FIELDS)
 
     def del_info(self):
-        pass
+        """
+        Удаляет запись о пользователе из таблицы пользователей,
+         а также удаляет связанную с ним таблицу с данными
+       """
+        query = f"DELETE FROM {TGUser.TABLE_NAME} WHERE tg_user_id = ?"
+        self.perform_query(query, (self._tg_user_id,), fetch='one')
+        self.drop_table(f'id_{str(self._tg_user_id)}')

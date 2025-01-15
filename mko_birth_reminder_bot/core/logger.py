@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 from .config_reader import ConfigReader
-
+from logging.handlers import RotatingFileHandler
 
 class Logger:
     """
@@ -16,24 +16,33 @@ class Logger:
     def __init__(self, config: ConfigReader):
         self.logger = logging.getLogger(__name__)
 
-        self.logger.setLevel(logging.INFO)
+
         # Получаем настройки из конфигурации
         log_path = config.get("path", "")
         log_file = config.get("file", f"{__name__}.log")
-        log_level = getattr(logging, config["log_level"].upper(), logging.INFO)
-        max_log_size = config.get("max_log_size", 5 * 1024 * 1024)  # Размер файла в байтах (по умолчанию 5 MB)
-        backup_count = config.get("backup_count", 3)  # Количество архивных файлов
 
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%d-%m-%y %I:%M:%S %p')
+        log_level = getattr(logging, config["log_level"].upper(), logging.INFO)
+        max_log_size = int(config.get("max_log_size", 5 ))* 1024 * 1024  # Размер файла в байтах (по умолчанию 5 MB)
+        backup_count = int(config.get("backup_count", 2))  # Количество архивных файлов
+        # Настройка обработчика с ротацией
+
+        self.logger.setLevel(log_level)
 
         try:
-
             log_file_path = Path(log_path, log_file)
-            file_handler = logging.FileHandler(
-                log_file_path, encoding='utf-8', )
-            file_handler.setFormatter(formatter)
-            self.logger.addHandler(file_handler)
-            file_handler.close()
+            # Настройка обработчика с ротацией
+            handler = RotatingFileHandler(
+                log_file_path, maxBytes=max_log_size, backupCount=backup_count, encoding='utf-8'
+            )
+            handler.setFormatter(
+                logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt='%d-%m-%y %I:%M:%S %p')
+            )
+
+            # Настройка логгера
+            self.logger = logging.getLogger(__name__)
+            self.logger.setLevel(log_level)
+            self.logger.addHandler(handler)
+            handler.close()
         except FileNotFoundError:
             print("Logging file not found")
 
