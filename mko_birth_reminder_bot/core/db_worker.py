@@ -1,24 +1,26 @@
 import sqlite3
 from typing import List, Tuple, Optional, Any, Dict, Literal, Union
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-
+import pandas as pd
 from .config_reader import ConfigReader
 from .logger import Logger
+from .utils import data_validation
 
 
 class DBWorker:
     DATA_TO_SQL_PARAMS = {
         'if_exists': 'append',
-        'index': True,
-        'index_label': 'id',
+        'index': False,
+        'method': 'multi',
     }
 
     def __init__(self, config: ConfigReader, logger: Logger):
-        self.db_settings = config
+        self.db_settings = config.db_settings
         self.logger = logger
         self.db_con = self._db_connect()
 
+        # настраиваем тип возвращаемых данных row_factory
         self.db_con.row_factory = sqlite3.Row
 
     def _db_connect(self):
@@ -111,16 +113,75 @@ class DBWorker:
 class TGUserData(DBWorker):
     """Класс для работы с данными пользователей."""
 
-    def __init__(self, config: ConfigReader, logger: Logger, data_tbl_name: Optional[str] = None):
+    def __init__(self, config: ConfigReader, logger: Logger, data_tbl_name: str | None = None):
         super().__init__(config, logger)
         self.columns = self.db_settings['columns']
         self.column_names = list(self.columns.keys())
         self.date_column = self.db_settings['date_column']
-        self.notice_before_days_column = self.db_settings['notice_before_days']
-        self.date_format = self.db_settings["date_format"] # %d/%m/%y
+        self.date_format = self.db_settings["date_format"]  # %d/%m/%y
+
+        self.notice_before_days_column = self.db_settings['columns']['notice_before_days']
         self.data_tbl_name = data_tbl_name
 
-    def get_data_in_dates_interval(self, start_date: str, end_date: str) -> List[Tuple[Any, ...]]:
+    def add_data(self, prepared_data:pd.DataFrame, sql_loader_settings: Optional[Dict[str, Any]] = None) -> int:
+        """Добавляет данные в таблицу."""
+        if sql_loader_settings is None:
+            sql_loader_settings = DBWorker.DATA_TO_SQL_PARAMS
+        prepared_data.to_sql(
+            **sql_loader_settings,
+            name=self.data_tbl_name,
+            con=self.db_con
+        )
+        self.logger.info(f"Добавлено {prepared_data.shape[0]} записей.")
+        return prepared_data.shape[0]
+
+    def flush_data(self):
+        self.drop_table(self.data_tbl_name)
+        self.create_table(self.data_tbl_name, self.columns)
+
+    def add_record(self, **data) -> None:
+        """
+        Insert record to database in a form of column_name = value
+        """
+        valid_data = data_validation(self.column_names, self.date_column, self.date_format, data)
+        if valid_data:
+            key_str = ', '.join(valid_data.keys())
+            q_str = ', '.join(['?'] * len(valid_data.keys()))
+            query = f""" INSERT INTO {self.data_tbl_name} ({key_str}) VALUES ({q_str})"""
+            self.perform_query(query, tuple(valid_data.values()))
+
+    def update_record_field_by_id(self, record_id: int, field_name: str, field_value: str | int) -> None:
+        """
+        Обновляет значение поля в базе данных для текущего пользователя.
+
+        :param record_id: id столбца, который нужно обновить.
+        :param field_name: Новое значение для столбца.
+        :param field_value: Новое значение для столбца.
+        :return: True, если обновление прошло успешно, иначе False.
+        """
+        if field_name not in self.column_names:
+            self.logger.error(f"Попытка обновить недопустимое поле: {field_name}")
+            return None
+        field_value = data_validation(self.column_names, self.date_column, self.date_format, {field_name: field_value})
+        query = f"""UPDATE {self.data_tbl_name} SET {field_name} = ? WHERE tg_user_id = ?"""
+        return self.perform_query(query, (field_value, record_id), fetch=None)
+
+    def del_record_by_id(self, record_id: int) -> None:
+        """
+        Удаляет запись из таблицы по id.
+        :param record_id: id записи для удаления.
+        :return: None
+       """
+        try:
+            record_id = int(record_id)
+        except ValueError as e:
+            self.logger.error(f"Value error record_id must be an integer, {e} {record_id}")
+        else:
+            query = f"DELETE FROM {self.data_tbl_name} WHERE id = ?"
+            self.perform_query(query, (record_id,))
+
+    def get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[
+        Union[List[sqlite3.Row], sqlite3.Row]]:
         """Возвращает данные в диапазоне дат.
 
         :param start_date: Начальная дата (DD/MM/YYYY).
@@ -152,25 +213,6 @@ class TGUserData(DBWorker):
                 f"{start_month_day[0]:02d}-{start_month_day[1]:02d}",
                 f"{end_month_day[0]:02d}-{end_month_day[1]:02d}",
             )
-
-        return self.perform_query(query, params, fetch='all')
-
-    def get_upcoming_birthdays(self, current_date=None):
-        """
-        Fetch users whose birthdays match their 'notice_before' days from the current date.
-
-        :param connection: SQLite database connection object.
-        :param current_date: Optional, current date as a string in 'YYYY-MM-DD' format. Defaults to today.
-        :return: List of users with matching birthdays.
-        """
-        if current_date is None:
-            current_date = datetime.now().strftime(self.date)
-
-        today = datetime.strptime(current_date, self.date_format)
-        query = f"""SELECT * FROM {self.data_tbl_name}
-                    WHERE 
-                  (strftime('%m-%d', {self.date_column}) = strftime('%m-%d', DATE(?, '+' || {self.notice_before_days_column} || ' days')))
-                """
         """
         #    SELECT * FROM {self.data_tbl_name}
         #    WHERE 
@@ -178,37 +220,44 @@ class TGUserData(DBWorker):
         #        OR 
         #        (strftime('%m-%d', DATE({self.date_column})) < strftime('%m-%d', ?) AND strftime('%m-%d', ?) < strftime('%m-%d', ?))
         #    """
-        # cursor.execute(query, (start_date, end_date, end_date, start_date, end_date))
-        return self.perform_query(query, (current_date,),fetch='all')
+        # (query, (start_date, end_date, end_date, start_date, end_date))
+        return self.perform_query(query, params, fetch='all')
 
+    def get_upcoming_dates(self, notice_period_days: int = 0) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
+        """
+        Fetch users whose birthdays match their 'notice_period_days' days from the current date.
+        :return: List of users with matching birthdays.
+        """
+        try:
+            target_date = datetime.now() + timedelta(days=int(notice_period_days))
+            target_date_str = target_date.strftime('%d/%m')
+        except ValueError as err:
+            self.logger.error(f"Invalid value for notice_period_days: {err}")
+            return []
+        else:
+            query = f"""
+                    SELECT * FROM {self.data_tbl_name}
+                    WHERE strftime('%d/%m', {self.date_column}) = ?
+                    """
+            return self.perform_query(query, (target_date_str,), fetch='all')
 
-    def add_data(self, prepared_data, sql_loader_settings: Optional[Dict[str, Any]] = None) -> int:
-        """Добавляет данные в таблицу."""
-        if sql_loader_settings is None:
-            sql_loader_settings = DBWorker.DATA_TO_SQL_PARAMS
-        prepared_data.to_sql(
-            **sql_loader_settings,
-            name=self.data_tbl_name,
-            con=self.db_con
-        )
-        self.logger.info(f"Добавлено {prepared_data.shape[0]} записей.")
-        return prepared_data.shape[0]
+    def get_upcoming_dates_custom_column(self):
+        """
+        Fetch users whose birthdays match their 'notice_before' days from the current date.
+        :return: List of users with matching birthdays.
+        """
 
-    def flush_data(self):
-        # TODO: добавить update_full
-        pass
+        current_date = datetime.now().strftime('%d/%m/%Y')
 
-    def add_record(self):
-        # TODO: добавить update_by_id
-        pass
+        # SQL query with dynamic table and column names
+        query = f"""
+        SELECT * FROM {self.data_tbl_name}
+        WHERE 
+            strftime('%d/%m', {self.date_column}) = 
+            strftime('%d/%m', DATE(?, '+' || {self.notice_before_days_column} || ' days'))
+        """
 
-    def update_record_by_id(self, record_id):
-        # TODO: добавить update_by_id
-        pass
-
-    def del_record_by_id(self, record_id):
-        # TODO: добавить update_by_id
-        pass
+        return self.perform_query(query, (current_date,), fetch='all')
 
 
 class TGUser(DBWorker):
@@ -221,6 +270,7 @@ class TGUser(DBWorker):
 
     def __init__(self, config: ConfigReader, logger: Logger, tg_user_id: int):
         super().__init__(config, logger)
+        self.date_format = self.db_settings['date_format']
         self._tg_user_id = int(tg_user_id)
         self._info = self.get_info()
         if self._info:
@@ -309,7 +359,7 @@ class TGUser(DBWorker):
         """
         Добавляет в базу таблицу для загрузки данных пользователя.
        """
-        self.create_table(f'id_{str(self._tg_user_id)}', TGUser.TABLE_FIELDS)
+        self.create_table(f'id_{str(self._tg_user_id)}', self.db_settings["columns"])
 
     def del_info(self):
         """
