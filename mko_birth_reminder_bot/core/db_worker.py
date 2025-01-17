@@ -120,7 +120,7 @@ class TGUserData(DBWorker):
         self.date_column = self.db_settings['date_column']
         self.date_format = self.db_settings["date_format"]  # %d/%m/%y
 
-        self.notice_before_days_column = self.db_settings['columns']['notice_before_days']
+        self.notice_before_days_column = self.db_settings['custom_notice_column']
         self.data_tbl_name = data_tbl_name
 
     def add_data(self, prepared_data:pd.DataFrame, sql_loader_settings: Optional[Dict[str, Any]] = None) -> int:
@@ -230,14 +230,15 @@ class TGUserData(DBWorker):
         """
         try:
             target_date = datetime.now() + timedelta(days=int(notice_period_days))
-            target_date_str = target_date.strftime('%d/%m')
+
+            target_date_str = target_date.strftime('%m-%d')
         except ValueError as err:
             self.logger.error(f"Invalid value for notice_period_days: {err}")
             return []
         else:
             query = f"""
                     SELECT * FROM {self.data_tbl_name}
-                    WHERE strftime('%d/%m', {self.date_column}) = ?
+                    WHERE strftime('%m-%d', {self.date_column}) = ?
                     """
             return self.perform_query(query, (target_date_str,), fetch='all')
 
@@ -247,14 +248,14 @@ class TGUserData(DBWorker):
         :return: List of users with matching birthdays.
         """
 
-        current_date = datetime.now().strftime('%d/%m/%Y')
+        current_date = datetime.now().strftime('%Y-%m-%d')
 
         # SQL query with dynamic table and column names
         query = f"""
         SELECT * FROM {self.data_tbl_name}
         WHERE 
-            strftime('%d/%m', {self.date_column}) = 
-            strftime('%d/%m', DATE(?, '+' || {self.notice_before_days_column} || ' days'))
+            strftime('%m-%d', {self.date_column}) = 
+            strftime('%m-%d', DATE(?, '+' || {self.notice_before_days_column} || ' days'))
         """
 
         return self.perform_query(query, (current_date,), fetch='all')

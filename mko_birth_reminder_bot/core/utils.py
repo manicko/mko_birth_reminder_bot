@@ -1,11 +1,15 @@
 from datetime import datetime, date
 from os import PathLike
 import re
-from typing import Optional, Tuple
+from typing import Union, List, Optional, Tuple
 from yaml import (safe_load as yaml_safe_load, YAMLError)
-
+import sqlite3
 
 DATE_PATTERNS = ('%d.%m.%Y', '%Y.%m.%d', '%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d')
+
+
+def dict_from_row(rows:Union[List[sqlite3.Row], sqlite3.Row]):
+    return [dict(zip(row.keys(), row)) for row in rows]
 
 def gen_date_patterns(date_pattern: list[str] = ("%d", "%m", "%Y"),
                       concat_symbols: list[str] = ('.', '-', '/')) -> tuple[str, ...]:
