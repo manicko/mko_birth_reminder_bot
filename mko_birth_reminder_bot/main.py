@@ -1,8 +1,8 @@
-from core import CSVWorker,DBWorker, TGUser, TGUserData, ConfigReader, Logger
+from core import CSVWorker,DBWorker, TGUser, TGUserData, CONFIG, Logger
 from pathlib import Path
 
-config = ConfigReader()
-logger = Logger(config.logs)
+config = CONFIG
+logger = Logger(config.log_settings)
 
 def init():
     with DBWorker(config.db_settings, logger) as db_worker:

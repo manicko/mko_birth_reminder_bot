@@ -1,12 +1,12 @@
-from datetime import datetime
+import logging
 from pathlib import Path
 from typing import List, Tuple, Optional
 import pandas as pd
-
 from .utils import (get_date, get_text)
-from .config_reader import ConfigReader
-from .logger import Logger
+from .config_reader import CONFIG
 
+logger = logging.getLogger(__name__)
+config = CONFIG
 
 class CSVWorker:
     """
@@ -14,7 +14,7 @@ class CSVWorker:
     It includes methods for data validation and text cleaning.
     """
 
-    def __init__(self, config: ConfigReader, logger: Logger, keep_files: bool = True) -> None:
+    def __init__(self, keep_files: bool = True) -> None:
         """
         Initialize the CSVWorker with configuration and logger.
 
@@ -22,7 +22,7 @@ class CSVWorker:
         :param logger: Instance of Logger for logging events and errors.
         :param keep_files: Boolean to determine if temporary files should be retained.
         """
-        self.config = config
+        self.config = CONFIG
         self.logger = logger
         self.keep_files = keep_files
 

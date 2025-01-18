@@ -3,9 +3,11 @@ from typing import List, Tuple, Optional, Any, Dict, Literal, Union
 from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
-from .config_reader import ConfigReader
-from .logger import Logger
+from .config_reader import CONFIG
+
 from .utils import data_validation
+import logging
+logger = logging.getLogger(__name__)
 
 
 class DBWorker:
@@ -15,8 +17,8 @@ class DBWorker:
         'method': 'multi',
     }
 
-    def __init__(self, config: ConfigReader, logger: Logger):
-        self.db_settings = config.db_settings
+    def __init__(self):
+        self.db_settings = CONFIG.db_settings
         self.logger = logger
         self.db_con = self._db_connect()
 
@@ -113,8 +115,8 @@ class DBWorker:
 class TGUserData(DBWorker):
     """Класс для работы с данными пользователей."""
 
-    def __init__(self, config: ConfigReader, logger: Logger, data_tbl_name: str | None = None):
-        super().__init__(config, logger)
+    def __init__(self, data_tbl_name: str | None = None):
+        super().__init__()
         self.columns = self.db_settings['columns']
         self.column_names = list(self.columns.keys())
         self.date_column = self.db_settings['date_column']
@@ -269,8 +271,8 @@ class TGUser(DBWorker):
         'notify_before_days': 'INTEGER',
     }
 
-    def __init__(self, config: ConfigReader, logger: Logger, tg_user_id: int):
-        super().__init__(config, logger)
+    def __init__(self, tg_user_id: int):
+        super().__init__()
         self.date_format = self.db_settings['date_format']
         self._tg_user_id = int(tg_user_id)
         self._info = self.get_info()
