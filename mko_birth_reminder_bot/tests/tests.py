@@ -5,9 +5,8 @@ import pytest
 import sqlite3
 from mko_birth_reminder_bot.core import TGUser
 from mko_birth_reminder_bot.tests.conftest import get_csv, generate_valid_test_data
+from mko_birth_reminder_bot.core.utils import (dict_from_row)
 from pathlib import Path
-data1 = ['Сириус', 'Сергеевич', 'Сергей', 'Сетевой', 'VIP', '01.01.1988', 1]
-data2 = ['Сириус', 'Сергеевич', 'Сергей', 'Сетевой', 'VIP', '01.01.1988', 1]
 
 
 
@@ -29,7 +28,8 @@ class TestConfig:
 
     def test_log(self, config):
         print(config.log_settings['root'])
-        assert len(config.log_settings) !=0, f"Configuration does not contain log settings"
+        assert len(config.log_settings) != 0, f"Configuration does not contain log settings"
+
 
 class TestCSVReader:
     def test_read_data(self, csv_worker):
@@ -38,16 +38,10 @@ class TestCSVReader:
             df = csv_worker.read_csv(valid_test_csv)
             df = csv_worker.prepare_dataframe(df)
 
-            assert len(df) > 0 , f"No data read"
+            assert len(df) > 0, f"No data read"
         except Exception as e:
             pytest.fail(f"Fail to del_info: {e}")
 
-    # Clean up: Remove the temporary files after the tests
-    @pytest.fixture(autouse=True)
-    def cleanup_temp_files(self, config):
-        yield
-        target_output = Path(config['CSV']["EXPORT_DATA"]["path"], 'test_data.csv')
-        target_output.unlink()
 
 class TestTGUser:
     def test_is_user(self, random_user):
@@ -78,21 +72,27 @@ class TestTGUser:
         except Exception as e:
             pytest.fail(f"Fail to get_info: {e}")
 
-
-    def test_del_info(self, random_user):
+    def test_data_load(self, random_user, csv_worker, data_worker):
         try:
-            random_user.del_info()
-            assert random_user.get_info() is None ,f"Info is not deleted: {random_user.get_info()}"
+            valid_test_csv = get_csv(generate_valid_test_data(20))
+            df = csv_worker.read_csv(valid_test_csv)
+            df = csv_worker.prepare_dataframe(df)
+            data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            data_worker.add_data(df)
         except Exception as e:
-            pytest.fail(f"Fail to del_info: {e}")
+            pytest.fail(f"Fail to get_info: {e}")
 
+    def test_default_reminders(self, random_user,data_worker):
+        test = []
+        for i in range(366):
+            if x := data_worker.get_upcoming_dates(i):
+                test.append(dict_from_row(x))
+        assert len(test) == 20, f'Not all records got from test_data{test}'
 
+    def test_custom_reminders(self, random_user):
 
-    def test_data_load(self, random_user, csv_worker,data_worker):
-        df = csv_worker.read_csv('dates.csv')
-        df = csv_worker.prepare_dataframe(df)
-        data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
-        data_worker.add_data(df)
+        if x := data_worker.get_upcoming_dates_custom_column():
+            print(dict_from_row(x))
 
     # # def test_load_user():
     #     with TGUser(**CONFIGURATION, tg_user_id=3232) as user_worker, \
@@ -120,3 +120,9 @@ class TestTGUser:
     #     print(utils.dict_from_row(x))
 
     # user_worker.del_info()
+    def test_del_info(self, random_user):
+        try:
+            random_user.del_info()
+            assert random_user.get_info() is None, f"Info is not deleted: {random_user.get_info()}"
+        except Exception as e:
+            pytest.fail(f"Fail to del_info: {e}")

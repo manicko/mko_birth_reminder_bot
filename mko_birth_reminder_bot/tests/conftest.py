@@ -114,3 +114,10 @@ def get_csv(test_data: List[Dict[str, str]]) -> Path:
         print(f"An error occurred while saving to CSV: {e}")
 
 
+# Clean up: Remove the temporary files after the tests
+@pytest.fixture(autouse=True)
+def cleanup_temp_files(config):
+    yield
+    target_output = Path(config['CSV']["EXPORT_DATA"]["path"], 'test_data.csv')
+    if target_output.is_file():
+        target_output.unlink()

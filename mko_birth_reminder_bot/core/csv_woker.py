@@ -4,9 +4,7 @@ from typing import List, Tuple, Optional
 import pandas as pd
 from .utils import (get_date, get_text)
 from .config_reader import CONFIG
-
 logger = logging.getLogger(__name__)
-config = CONFIG
 
 class CSVWorker:
     """
@@ -17,9 +15,6 @@ class CSVWorker:
     def __init__(self, keep_files: bool = True) -> None:
         """
         Initialize the CSVWorker with configuration and logger.
-
-        :param config: Instance of ConfigReader containing application settings.
-        :param logger: Instance of Logger for logging events and errors.
         :param keep_files: Boolean to determine if temporary files should be retained.
         """
         self.config = CONFIG

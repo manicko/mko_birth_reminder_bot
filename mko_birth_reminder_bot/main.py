@@ -1,19 +1,18 @@
-from core import CSVWorker,DBWorker, TGUser, TGUserData, CONFIG, Logger
+from core import CSVWorker,DBWorker, TGUser, TGUserData, CONFIG
 from pathlib import Path
 
-config = CONFIG
-logger = Logger(config.log_settings)
+
 
 def init():
-    with DBWorker(config.db_settings, logger) as db_worker:
+    with DBWorker() as db_worker:
         db_worker.create_table(TGUser.TABLE_NAME, TGUser.TABLE_FIELDS)
 
 
 def main():
-    tg_user_id = 'id_7777'
-    data_con = TGUser(config.db_settings, logger, tg_user_id)
+    tg_user_id = 7777
+    data_con = TGUser(tg_user_id)
 
-    csv = CSVWorker(config, logger)
+    csv = CSVWorker()
 
     df = csv.read_csv('dates.csv')
     df = csv.prepare_dataframe(df)
