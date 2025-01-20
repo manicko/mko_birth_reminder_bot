@@ -6,31 +6,7 @@ import faker
 import pandas as pd
 from typing import List, Dict
 
-COMPANIES = ["Acme Corp", "Beta Inc", "Gamma LLC", "Delta Ltd", "Epsilon Co", "Zeta Group", "Eta Partners", "Theta Inc"]
-POSITIONS = ["Manager", "Developer", "Analyst", "Designer", "Consultant", "HR", "CEO", "Sales", "Marketing",
-             "Accountant"]
-GIFT_CATEGORIES = ["Luxury", "Tech", "Books", "Art", "Travel", "Fashion", "Food", "Gadgets", "Wellness"]
-
-invalid_data = [
-    ("Acme Corp", "Smith", "John", "Manager", "Luxury", "1985-06-15", 7),
-    ("Beta Inc", "Doe", "Jane", "Developer", "Tech", "1990-03-22", 14),
-    ("Gamma LLC", "Brown", "Charlie", "Analyst", "Books", "1988-11-05", 3),
-    ("Delta Ltd", "Johnson", "Emily", "Designer", "Art", "1992-08-19", 10),
-    ("Epsilon Co", "Davis", "Michael", "Consultant", "Travel", "1980-12-30", 5),
-    ("Zeta Group", "Wilson", "Anna", "HR", "Fashion", "1995-04-18", 7),
-    ("Eta Partners", "Taylor", "James", "CEO", "Luxury", "1978-09-23", 30),
-    ("Theta Inc", "Martinez", "Sophia", "Sales", "Food", "1987-01-11", 2),
-    ("Iota Ltd", "Garcia", "David", "Marketing", "Gadgets", "1991-07-07", 15),
-    ("Kappa Co", "Anderson", "Laura", "Accountant", "Wellness", "1983-02-28", 7),
-    ("Alpha Corp", "Black", "Olivia", "Engineer", "Music", "2024-12-25", 20),
-    ("Beta Enterprises", "White", "Ethan", "Manager", "Books", "2024-12-31", 20),
-    ("Gamma LLC", "Green", "Sophia", "Consultant", "Travel", "2025-01-01", 20),
-    ("Delta Ltd", "Gray", "Lucas", "Developer", "Technology", "2025-01-03", 20),
-    ("Lambda Co", "Hughes", "Emily", "Researcher", "Books", "2024-12-29", 10),
-    ("Mu Inc", "Reed", "Oliver", "Engineer", "Tech", "2024-12-30", 15),
-    ("Nu Partners", "Walker", "Emma", "Strategist", "Fashion", "2025-01-02", 20),
-    ("Xi Group", "Hall", "Liam", "Advisor", "Luxury", "2025-01-04", 5),
-]
+from .test_data import TestData
 
 
 @pytest.fixture(scope="class")
@@ -41,6 +17,20 @@ def config():
 def random_user_id():
     return random.randrange(10 ** 11, 10 ** 12)
 
+def get_test_data(num_records: int = 1, valid = True) -> list:
+    """
+    Generates test data for a database table basing on prepared lists
+
+    :param num_records: Number of records to generate. If 0 returns whole set
+    :param valid: which type of data return - True if valid, false if not
+    :return: List of dictionaries with generated test data.
+    """
+    if valid:
+        data = TestData.valid_data_en + TestData.valid_data_ru
+    else:
+        data = TestData.invalid_data_en + TestData.invalid_data_ru
+
+    return data if num_records == 0 else random.sample(data, num_records)
 
 def generate_valid_test_data(num_records: int = 1) -> list:
     """
@@ -52,11 +42,11 @@ def generate_valid_test_data(num_records: int = 1) -> list:
     fake = faker.Faker()
     test_data = []
     for _ in range(num_records):
-        company = random.choice(COMPANIES)
+        company = random.choice(TestData.COMPANIES)
         last_name = fake.last_name()
         first_name = fake.first_name()
-        position = random.choice(POSITIONS)
-        gift_category = random.choice(GIFT_CATEGORIES)
+        position = random.choice(TestData.POSITIONS)
+        gift_category = random.choice(TestData.GIFT_CATEGORIES)
 
         # Генерация даты рождения в диапазоне от 20 до 60 лет назад
         birth_date = fake.date_of_birth(minimum_age=20, maximum_age=60).strftime('%Y-%m-%d')
@@ -88,7 +78,8 @@ def csv_worker():
 def random_user():  # Возвращает логин
     with TGUser(random_user_id()) as tmp_user_worker:
         yield tmp_user_worker
-        tmp_user_worker.del_info()
+        # удаляем пользователя из базы в любом случае
+        # tmp_user_worker.del_info()
 
 
 @pytest.fixture(scope="class")

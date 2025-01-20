@@ -39,18 +39,37 @@ class CSVWorker:
         :param csv_file: Name of the CSV file to read.
         :return: DataFrame with the CSV data or an empty DataFrame on failure.
         """
+        file_path = self.import_path / csv_file
         try:
-            file_path = self.import_path / csv_file
-            print(self.data_column_names)
+            # Read only the header row to validate column count
+            first_row = pd.read_csv(file_path, nrows=1, **self.reader_settings)
+            actual_columns = len(first_row.columns)
+            expected_columns = len(self.data_column_names)
+
+            if actual_columns != expected_columns:
+                self.logger.error(
+                    f"Column count mismatch in file {file_path}: "
+                    f"Expected {expected_columns} columns, but got {actual_columns} columns."
+                )
+                return pd.DataFrame()
+
+            # If column count matches, read the full file
             df = pd.read_csv(filepath_or_buffer=file_path,
                              names=self.data_column_names,
                              **self.reader_settings)
             self.logger.info(f"Successfully read CSV file: {file_path}")
             return df
-        except (pd.errors.ParserError, pd.errors.DataError) as err:
-            self.logger.warning("Failed to load data from CSV.")
+        except FileNotFoundError:
+            self.logger.error(f"CSV file not found: {file_path}")
+        except pd.errors.ParserError as err:
+            self.logger.warning(f"Failed to parse CSV file: {file_path}")
             self.logger.error(err)
-            return pd.DataFrame()
+        except pd.errors.DataError as err:
+            self.logger.warning(f"Data error while reading CSV file: {file_path}")
+            self.logger.error(err)
+        except Exception as err:
+            self.logger.error(f"Unexpected error occurred: {err}")
+        return pd.DataFrame()
 
     def export_to_csv(self, df: pd.DataFrame, file_name: str) -> Optional[Path]:
         """

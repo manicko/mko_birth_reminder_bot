@@ -1,6 +1,5 @@
-import logging.config
-from mko_birth_reminder_bot.core import CONFIG
+# from mko_birth_reminder_bot.core import logger
 
-logging.config.dictConfig(CONFIG.log_settings)
+
 
 

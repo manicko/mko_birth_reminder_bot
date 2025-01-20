@@ -1,5 +1,5 @@
-from core import CSVWorker,DBWorker, TGUser, TGUserData, CONFIG
-from pathlib import Path
+from mko_birth_reminder_bot.core import CSVWorker,DBWorker, TGUser, TGUserData, CONFIG
+import mko_birth_reminder_bot.core.logger
 
 
 

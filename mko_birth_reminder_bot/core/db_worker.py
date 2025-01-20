@@ -7,6 +7,7 @@ from .config_reader import CONFIG
 
 from .utils import data_validation
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -125,7 +126,7 @@ class TGUserData(DBWorker):
         self.notice_before_days_column = self.db_settings['custom_notice_column']
         self.data_tbl_name = data_tbl_name
 
-    def add_data(self, prepared_data:pd.DataFrame, sql_loader_settings: Optional[Dict[str, Any]] = None) -> int:
+    def add_data(self, prepared_data: pd.DataFrame, sql_loader_settings: Optional[Dict[str, Any]] = None) -> int:
         """Добавляет данные в таблицу."""
         if sql_loader_settings is None:
             sql_loader_settings = DBWorker.DATA_TO_SQL_PARAMS
@@ -145,7 +146,13 @@ class TGUserData(DBWorker):
         """
         Insert record to database in a form of column_name = value
         """
+        if self.date_column not in data:
+            # Stop if no date column provided
+            logger.warning(f"No date column is found, {self.date_column} is mandatory.")
+            return
+
         valid_data = data_validation(self.column_names, self.date_column, self.date_format, data)
+
         if valid_data:
             key_str = ', '.join(valid_data.keys())
             q_str = ', '.join(['?'] * len(valid_data.keys()))
@@ -182,8 +189,8 @@ class TGUserData(DBWorker):
             query = f"DELETE FROM {self.data_tbl_name} WHERE id = ?"
             self.perform_query(query, (record_id,))
 
-    def get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[
-        Union[List[sqlite3.Row], sqlite3.Row]]:
+    def get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
+
         """Возвращает данные в диапазоне дат.
 
         :param start_date: Начальная дата (DD/MM/YYYY).
