@@ -40,7 +40,7 @@ class DBWorker:
     def perform_query(
             self,
             query: str,
-            term: Optional[Tuple] = tuple(),
+            term: Optional[Tuple|List] = tuple(),
             fetch: Literal['all', 'one', None] = None,
             raise_exceptions: bool = False
     ) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
@@ -154,26 +154,69 @@ class TGUserData(DBWorker):
         valid_data = data_validation(self.column_names, self.date_column, self.date_format, data)
 
         if valid_data:
-            key_str = ', '.join(valid_data.keys())
-            q_str = ', '.join(['?'] * len(valid_data.keys()))
-            query = f""" INSERT INTO {self.data_tbl_name} ({key_str}) VALUES ({q_str})"""
-            self.perform_query(query, tuple(valid_data.values()))
+            try:
+                key_str = ', '.join(valid_data.keys())
+                q_str = ', '.join(['?'] * len(valid_data.keys()))
+                values = tuple(valid_data.values())
+                query = f""" INSERT INTO {self.data_tbl_name} ({key_str}) VALUES ({q_str})"""
+                self.perform_query(query, values)
+            except Exception as e:
+                self.logger.error(e)
 
-    def update_record_field_by_id(self, record_id: int, field_name: str, field_value: str | int) -> None:
+    def get_record_by_id(self, record_id: int) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
         """
-        Обновляет значение поля в базе данных для текущего пользователя.
+        Получает запись из таблицы данных текущего пользователя по id.
 
-        :param record_id: id столбца, который нужно обновить.
-        :param field_name: Новое значение для столбца.
-        :param field_value: Новое значение для столбца.
-        :return: True, если обновление прошло успешно, иначе False.
+        :param record_id: id строки, которую необходимо получить.
         """
-        if field_name not in self.column_names:
-            self.logger.error(f"Попытка обновить недопустимое поле: {field_name}")
+        try:
+            row_id = int(record_id)
+            query = f"""SELECT * FROM {self.data_tbl_name} WHERE id = ?"""
+            return self.perform_query(query, (row_id,), fetch='one')
+        except ValueError:
+            self.logger.warning(F"Недопустимый id записи: '{record_id}', id должен быть integer")
             return None
-        field_value = data_validation(self.column_names, self.date_column, self.date_format, {field_name: field_value})
-        query = f"""UPDATE {self.data_tbl_name} SET {field_name} = ? WHERE tg_user_id = ?"""
-        return self.perform_query(query, (field_value, record_id), fetch=None)
+
+    def update_record_by_id(self, record_id: int, **fields) -> None:
+        """
+        Updates a record in the user's data table by its ID.
+
+        Parameters:
+        ----------
+        record_id : int
+            The ID of the record to be updated.
+        fields : dict
+            Key-value pairs representing field names and their new values
+            in the format "field_name=field_value".
+
+        Returns:
+        -------
+        None
+
+        Behavior:
+        --------
+        - Validates the provided fields using the `data_validation` function.
+        - Constructs a SQL query dynamically based on the provided fields.
+        - Executes the SQL query to update the specified record.
+        - Logs errors in case of any validation or query execution issues.
+        """
+        try:
+            # Validate the input fields
+            validated_data = data_validation(self.column_names, self.date_column, self.date_format, fields)
+
+            # Construct the field assignment part of the SQL query dynamically
+            fields_assignment = ', '.join([f"{key} = ?" for key in validated_data.keys()])
+            values = list(validated_data.values())
+            values.append(record_id)  # Append the record ID as the last parameter
+
+            # Prepare the query string
+            query = f"UPDATE {self.data_tbl_name} SET {fields_assignment} WHERE id = ?"
+
+            # Execute the query
+            self.perform_query(query, values, fetch=None)
+        except (ValueError, AttributeError) as e:
+            # Log errors and return
+            self.logger.error(f"Error updating record with ID {record_id}: {e}")
 
     def del_record_by_id(self, record_id: int) -> None:
         """
@@ -189,7 +232,8 @@ class TGUserData(DBWorker):
             query = f"DELETE FROM {self.data_tbl_name} WHERE id = ?"
             self.perform_query(query, (record_id,))
 
-    def get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
+    def get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[
+        Union[List[sqlite3.Row], sqlite3.Row]]:
 
         """Возвращает данные в диапазоне дат.
 

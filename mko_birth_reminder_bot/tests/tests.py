@@ -82,7 +82,7 @@ class TestTGUser:
     #         assert info['tg_user_id'] == random_user.tg_user_id
     #     except Exception as e:
     #         pytest.fail(f"Fail to get_info: {e}")
-
+    #
     # def test_data_load(self, random_user, csv_worker, data_worker):
     #     try:
     #         valid_test_csv = get_csv(get_test_data(20))
@@ -92,14 +92,66 @@ class TestTGUser:
     #         data_worker.add_data(df)
     #     except Exception as e:
     #         pytest.fail(f"Fail to get_info: {e}")
+    #
+    # def test_flush(self, data_worker):
+    #     try:
+    #         data_worker.flush_data()
+    #     except Exception as e:
+    #         pytest.fail(f"Fail to flush_data: {e}")
 
-    def test_add_record(self,data_worker,csv_worker):
+    # def test_add_record(self,random_user, data_worker,csv_worker):
+    #     try:
+    #         data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
+    #         data_worker.flush_data()
+    #         data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
+    #         data_worker.add_record(**data)
+    #     except Exception as e:
+    #         pytest.fail(f"Fail to add_record: {e}")
+
+    def test_get_record(self, random_user, data_worker, csv_worker):
         try:
+            data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            data_worker.flush_data()
             data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
-            print(data)
             data_worker.add_record(**data)
+            assert data_worker.get_record_by_id("SELECT") is None
+            assert data_worker.get_record_by_id(2) is None
+            assert len(data_worker.get_record_by_id(1)) == len(
+                data_worker.column_names)  # 8 столбцов в таблице с данными
+            data_worker.flush_data()
         except Exception as e:
-            pytest.fail(f"Fail to add_record: {e}")
+            pytest.fail(f"Fail get_record: {e}")
+
+    def test_update_record(self, random_user, data_worker, csv_worker):
+        try:
+            data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            data_worker.flush_data()
+
+            data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
+            data_worker.add_record(**data)
+            data_worker.update_record_by_id(record_id=1, birth_date="1999/01/01")
+            updated_record = data_worker.get_record_by_id(1)
+            assert updated_record["birth_date"] == "1999-01-01"
+
+            data_worker.update_record_by_id(record_id=1,
+                                            company='TEST COMPANY',
+                                            last_name='TEST LAST NAME',
+                                            first_name='TEST FIRST NAME',
+                                            position='TEST POSITION',
+                                            gift_category='TEST GIFT CATEGORY',
+                                            notice_before_days=99,
+                                            birth_date='01/02/2023')
+            updated_record = data_worker.get_record_by_id(1)
+            assert updated_record["company"] == 'TEST COMPANY'
+            assert updated_record["last_name"] =='TEST LAST NAME'
+            assert updated_record["first_name"] == 'TEST FIRST NAME'
+            assert updated_record["position"] == 'TEST POSITION'
+            assert updated_record["gift_category"] == 'TEST GIFT CATEGORY'
+            assert updated_record["notice_before_days"] == 99
+            assert updated_record["birth_date"] == '2023-02-01'
+            #data_worker.flush_data()
+        except Exception as e:
+            pytest.fail(f"Fail get_record: {e}")
 
     # def test_data_drop(self, data_worker):
     #     try:
