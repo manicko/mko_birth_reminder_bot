@@ -144,24 +144,51 @@ class TGUserData(DBWorker):
 
     def add_record(self, **data) -> None:
         """
-        Insert record to database in a form of column_name = value
+        Inserts a new record into the database.
+
+        Parameters:
+        ----------
+        data : dict
+            Key-value pairs representing column names and their corresponding values
+            to be inserted into the database.
+
+        Returns:
+        -------
+        None
+
+        Behavior:
+        --------
+        - Validates the provided data using the `data_validation` function.
+        - Ensures the mandatory date column is provided in the data.
+        - Dynamically constructs and executes an SQL INSERT query.
+        - Logs a warning if the mandatory date column is missing.
+        - Logs any errors that occur during query execution.
+
+        Raises:
+        ------
+        None, but logs any errors internally.
         """
         if self.date_column not in data:
-            # Stop if no date column provided
-            logger.warning(f"No date column is found, {self.date_column} is mandatory.")
+            # Log a warning if the mandatory date column is missing
+            self.logger.warning(f"No date column found. '{self.date_column}' is mandatory.")
             return
 
-        valid_data = data_validation(self.column_names, self.date_column, self.date_format, data)
+        try:
+            # Validate the data
+            valid_data = data_validation(self.column_names, self.date_column, self.date_format, data)
 
-        if valid_data:
-            try:
+            if valid_data:
+                # Construct the SQL INSERT query dynamically
                 key_str = ', '.join(valid_data.keys())
                 q_str = ', '.join(['?'] * len(valid_data.keys()))
                 values = tuple(valid_data.values())
-                query = f""" INSERT INTO {self.data_tbl_name} ({key_str}) VALUES ({q_str})"""
+                query = f"INSERT INTO {self.data_tbl_name} ({key_str}) VALUES ({q_str})"
+
+                # Execute the query
                 self.perform_query(query, values)
-            except Exception as e:
-                self.logger.error(e)
+        except Exception as e:
+            # Log any errors that occur
+            self.logger.error(f"Error inserting record: {e}")
 
     def get_record_by_id(self, record_id: int) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
         """
