@@ -4,7 +4,7 @@ from typing import List, Tuple, Optional
 import pandas as pd
 from .utils import (get_date, get_text)
 from .config_reader import CONFIG
-logger = logging.getLogger(__name__)
+
 
 class CSVWorker:
     """
@@ -18,7 +18,7 @@ class CSVWorker:
         :param keep_files: Boolean to determine if temporary files should be retained.
         """
         self.config = CONFIG
-        self.logger = logger
+        self.logger = logging.getLogger(__name__)
         self.keep_files = keep_files
 
         self.data_column_names: List[str] = self._get_columns(self.config.db_settings["columns"])

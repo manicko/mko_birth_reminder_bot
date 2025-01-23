@@ -5,7 +5,7 @@ from typing import Dict, Union, List, Optional, Tuple
 from yaml import (safe_load as yaml_safe_load, YAMLError)
 import sqlite3
 import logging
-
+import uuid
 logger = logging.getLogger(__name__)
 DATE_PATTERNS = ('%d.%m.%Y', '%Y.%m.%d', '%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d')
 
@@ -16,6 +16,17 @@ def dict_from_row(rows: Union[List[sqlite3.Row], sqlite3.Row]):
     except TypeError as e:
         logger.error(e)
 
+def generate_random_filename(extension: str = "csv") -> str:
+    """
+    Generates a random filename with the specified extension.
+
+    Args:
+        extension (str): The file extension. Default is "csv".
+
+    Returns:
+        str: A randomly generated filename.
+    """
+    return f"{uuid.uuid4().hex}.{extension}"
 
 def gen_date_patterns(date_pattern: list[str] = ("%d", "%m", "%Y"),
                       concat_symbols: list[str] = ('.', '-', '/')) -> tuple[str, ...]:

@@ -79,7 +79,7 @@ def random_user():  # Возвращает логин
     with TGUser(random_user_id()) as tmp_user_worker:
         yield tmp_user_worker
         # удаляем пользователя из базы в любом случае
-        # tmp_user_worker.del_info()
+        tmp_user_worker.del_info()
 
 
 @pytest.fixture(scope="class")

@@ -4,7 +4,6 @@ import pandas as pd
 import datetime
 from freezegun import freeze_time
 
-from mko_birth_reminder_bot.tests.test_data import TestData
 data = [
     ["Eta Partners", "Taylor", "James", "CEO", "Luxury", "1978-09-05", 30],
     ["ПАО Эта", "Козлов", "Иван", "Генеральный директор", "Роскошь", "1978-09-23", 30],

@@ -176,12 +176,11 @@ cython_debug/
 
 /sessions/*
 
-*config.yaml
+
 /logs/*
 /tmp/*
-
+*secrets.yaml
 *.csv
-*credentials.json
 *token.json
 *.session*
 *.db

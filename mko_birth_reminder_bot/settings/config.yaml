@@ -1,0 +1,63 @@
+{
+  "DATABASE": {
+    "path": "C:/py_exp/mko_birth_reminder_bot/mko_birth_reminder_bot/data",
+    "db_file": "birthdays.db",
+    "columns": {
+      'id': 'INTEGER PRIMARY KEY AUTOINCREMENT',
+      'company': 'TEXT',
+      'last_name': 'TEXT',
+      'first_name': 'TEXT',
+      'position': 'TEXT',
+      'gift_category': 'TEXT',
+      'birth_date': 'TEXT NOT NULL',
+      'notice_before_days': 'INTEGER',
+    },
+    "custom_notice_column": 'notice_before_days',
+    "date_column": 'birth_date',
+    "date_format": '%Y-%m-%d' # only works if you respect the ISO8601 notation: YYYY-MM-DD
+  },
+  'CSV':
+    { 'READ_DATA': { # general settings for pandas CSV reader
+      "path": "C:/py_exp/mko_birth_reminder_bot/mko_birth_reminder_bot/tmp",
+      'from_csv': {
+        'sep': ';',
+        'on_bad_lines': 'skip',
+        'encoding': 'utf-8',
+        'index_col': False,
+        'skiprows': Null,
+        'header': 0  # ignor column names in CSV file
+      }
+    },
+      'EXPORT_DATA': {
+        "path": "C:/py_exp/mko_birth_reminder_bot/mko_birth_reminder_bot/tmp",
+        'to_csv': { # general settings for pandas CSV reader
+          'sep': ';',
+          'encoding': 'utf-8',
+          #          'mode': 'a',
+          'header': True,
+          'index': False,
+          #          'compression': { 'method': 'gzip' }
+        },
+      },
+
+    },
+  "TELETHON_API": {
+    "start_menu": [
+      [ { "add_record": "Добавить запись" } ],
+      [ { "update_record_by_id": "Скорректировать запись по id" },
+        { "delete_record_by_id": "Скорректировать запись по id" } ],
+      [ { "import_csv": "Импорт из csv" }, { "export_csv": "Экспорт в csv" } ],
+      [ { "delete_user": "Отписаться" } ],
+    ],
+    "add_record_menu": [
+      [ { "back_to_start": "Назад" } ],
+      [ { "company": "Компания" }, { "position": "Должность" }, { "gift_category": "Категория подарка" } ],
+      [ { "first_name": "Имя" }, { "last_name": "Фамилия" } ],
+      [ { "birth_date": "День рождения" }, { "notice_before_days": "За сколько дней предупредить" } ],
+      [ { "confirm_data": "Подтвердить" } ],
+    ]
+  },
+
+}
+
+

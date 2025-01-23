@@ -4,11 +4,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
 from .config_reader import CONFIG
-
 from .utils import data_validation
 import logging
 
-logger = logging.getLogger(__name__)
+
 
 
 class DBWorker:
@@ -20,7 +19,7 @@ class DBWorker:
 
     def __init__(self):
         self.db_settings = CONFIG.db_settings
-        self.logger = logger
+        self.logger = logging.getLogger(__name__)
         self.db_con = self._db_connect()
 
         # настраиваем тип возвращаемых данных row_factory
@@ -139,6 +138,7 @@ class TGUserData(DBWorker):
         return prepared_data.shape[0]
 
     def flush_data(self):
+        """"""
         self.drop_table(self.data_tbl_name)
         self.create_table(self.data_tbl_name, self.columns)
 
@@ -247,17 +247,44 @@ class TGUserData(DBWorker):
 
     def del_record_by_id(self, record_id: int) -> None:
         """
-        Удаляет запись из таблицы по id.
-        :param record_id: id записи для удаления.
-        :return: None
-       """
+        Deletes a record from the database table by its ID.
+
+        Parameters:
+        ----------
+        record_id : int
+            The ID of the record to be deleted.
+
+        Returns:
+        -------
+        None
+
+        Behavior:
+        --------
+        - Attempts to convert the provided `record_id` to an integer.
+        - Constructs and executes an SQL DELETE query to remove the record with the specified ID.
+        - Logs an error if the `record_id` is not a valid integer.
+
+        Raises:
+        ------
+        None, but logs errors internally.
+        """
         try:
+            # Ensure the record ID is a valid integer
             record_id = int(record_id)
         except ValueError as e:
-            self.logger.error(f"Value error record_id must be an integer, {e} {record_id}")
+            # Log the error if conversion fails
+            self.logger.error(f"Invalid record ID: must be an integer. Error: {e}, Provided: {record_id}")
         else:
-            query = f"DELETE FROM {self.data_tbl_name} WHERE id = ?"
-            self.perform_query(query, (record_id,))
+            try:
+                # Construct the SQL DELETE query
+                query = f"DELETE FROM {self.data_tbl_name} WHERE id = ?"
+                # Execute the query
+                self.perform_query(query, (record_id,), raise_exceptions=True)
+                # Optional: Log successful deletion
+                self.logger.info(f"Record with ID {record_id} successfully deleted.")
+            except Exception as e:
+                # Log any unexpected errors during query execution
+                self.logger.error(f"Error deleting record with ID {record_id}: {e}")
 
     def get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[
         Union[List[sqlite3.Row], sqlite3.Row]]:
