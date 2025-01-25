@@ -144,12 +144,11 @@ async def show_add_record_menu(event, user_id, rewrite = True):
     Показывает меню 2 уровня для ввода данных.
     """
     menu = make_menu("add_record_menu", TELETHON_API)
-    user_data[user_id]['state'] = "add_record_state"
     await handle_edit_respond(event, "Выберите поле для ввода данных:", buttons=menu, rewrite=rewrite)
 
 async def validate_record(event, user_id):
     user_info = user_data[user_id].get('params', {})
-    if 'birth_date' in user_info:
+    if 'birth_date' in user_info or user_data[user_id]['state'] == 'update_record_by_id_state':
         result = "\n".join(f"{key}: {value}" for key, value in user_info.items())
         await event.edit(f"Введенные данные:\n{result}")
         # Очищаем данные пользователя
@@ -190,6 +189,7 @@ async def handle_callback(event):
 
         # start menu
         case "add_record":
+            user_data[user_id]['state'] = "add_record_state"
             await show_add_record_menu(event, user_id)
 
         case "back_to_start":
@@ -197,19 +197,31 @@ async def handle_callback(event):
 
         # record_by_id
         case "update_record_by_id":
-            await show_input_id_menu(event, user_id)
+            user_data[user_id]['state'] = "update_record_by_id_state"
+
+            await ask_for_input(
+                event,
+                user_id,
+                'id',
+                f"Введите id записи которую хотите отредактировать."
+            )
 
         case "delete_record_by_id":
-            await show_input_id_menu(event, user_id)
+            user_data[user_id]['state'] = "update_record_by_id_state"
+
+            await ask_for_input(
+                event,
+                user_id,
+                'id',
+                f"Введите id записи которую хотите удалить."
+            )
 
         # import / export
         case "import_csv":
-            # TODO
-            pass
+            user_data[user_id]['state'] = "import_csv"
 
         case "export_csv":
-            # TODO
-            pass
+            user_data[user_id]['state'] = "export_csv"
 
         case "delete_user":
             await event.edit("Ваши данные удалены.")
@@ -224,7 +236,6 @@ async def handle_callback(event):
         case "confirm_record":
             await validate_record(event, user_id)
                 #await show_add_record_menu(event, user_id, rewrite = False)
-
 
         # case "accept_input":
         #     await show_add_record_menu(event, user_id)
@@ -249,14 +260,22 @@ async def handle_text(event):
                 user_data[user_id]['params'][waited_param_name] = event.raw_text
                 await show_add_record_menu(event, user_id)
             case 'update_record_by_id_state':
-                pass
+                waited_param_name = user_data[user_id].pop('waited_param_name', None)
+                user_data[user_id]['params'][waited_param_name] = event.raw_text
+                await show_add_record_menu(event, user_id)
+
             case 'delete_record_by_id_state':
-                pass
+                # TODO
+                await drop_user_state(user_id)
+
             case 'import_csv_state':
+                # TODO
                 pass
             case 'export_csv_state':
+                # TODO
                 pass
             case 'delete_user_state':
+                # TODO
                 pass
             case _:
                 pass
