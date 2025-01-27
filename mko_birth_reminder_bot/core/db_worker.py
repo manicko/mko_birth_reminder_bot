@@ -6,9 +6,7 @@ import pandas as pd
 from .config_reader import CONFIG
 from .utils import data_validation
 import logging
-
-
-
+from .errors import *
 
 class DBWorker:
     DATA_TO_SQL_PARAMS = {
@@ -39,7 +37,7 @@ class DBWorker:
     def perform_query(
             self,
             query: str,
-            term: Optional[Tuple|List] = tuple(),
+            term: Optional[Tuple | List] = tuple(),
             fetch: Literal['all', 'one', None] = None,
             raise_exceptions: bool = False
     ) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
@@ -190,6 +188,21 @@ class TGUserData(DBWorker):
             # Log any errors that occur
             self.logger.error(f"Error inserting record: {e}")
 
+    def get_all_records(self) -> pd.DataFrame:
+        """
+        Получает запись из таблицы данных текущего пользователя по id.
+
+        """
+        try:
+            query = f"""SELECT * FROM {self.data_tbl_name}"""
+            df = self.perform_query(query, fetch='all', raise_exceptions=True)
+            return pd.DataFrame(df)
+
+        except Exception as e:
+            self.logger.warning(F"Не удалось получить данные из '{self.data_tbl_name}', "
+                                F"из-за ошибки: '{e}' ")
+            return pd.DataFrame()
+
     def get_record_by_id(self, record_id: int) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
         """
         Получает запись из таблицы данных текущего пользователя по id.
@@ -274,6 +287,7 @@ class TGUserData(DBWorker):
         except ValueError as e:
             # Log the error if conversion fails
             self.logger.error(f"Invalid record ID: must be an integer. Error: {e}, Provided: {record_id}")
+            raise  WrongInput(f"Invalid record ID: must be an integer. Provided: {record_id}")
         else:
             try:
                 # Construct the SQL DELETE query
@@ -285,6 +299,7 @@ class TGUserData(DBWorker):
             except Exception as e:
                 # Log any unexpected errors during query execution
                 self.logger.error(f"Error deleting record with ID {record_id}: {e}")
+                raise f"Error deleting record with ID {record_id}"
 
     def get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[
         Union[List[sqlite3.Row], sqlite3.Row]]:
@@ -381,7 +396,9 @@ class TGUser(DBWorker):
         self.date_format = self.db_settings['date_format']
         self._tg_user_id = int(tg_user_id)
         self._info = self.get_info()
+        self.is_exist = False
         if self._info:
+            self.is_exist = True
             self._last_interaction_date = self._info['last_interaction_date']
             self._notify_before_days = self._info['notify_before_days']
         else:
@@ -477,3 +494,6 @@ class TGUser(DBWorker):
         query = f"DELETE FROM {TGUser.TABLE_NAME} WHERE tg_user_id = ?"
         self.perform_query(query, (self._tg_user_id,), fetch='one')
         self.drop_table(f'id_{str(self._tg_user_id)}')
+
+    def __del__(self):
+        self.update_last_interaction_date()

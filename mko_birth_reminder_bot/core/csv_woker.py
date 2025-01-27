@@ -2,6 +2,8 @@ import logging
 from pathlib import Path
 from typing import List, Tuple, Optional
 import pandas as pd
+
+from .errors import *
 from .utils import (get_date, get_text)
 from .config_reader import CONFIG
 
@@ -37,39 +39,48 @@ class CSVWorker:
         Reads a CSV file into a pandas DataFrame.
 
         :param csv_file: Name of the CSV file to read.
-        :return: DataFrame with the CSV data or an empty DataFrame on failure.
+        :return: DataFrame with the CSV data or raises an exception on failure.
         """
-        file_path = self.import_path / csv_file
+        file_path = Path(csv_file)
         try:
             # Read only the header row to validate column count
+
+            if not file_path.is_file():
+                file_path = Path(self.import_path, csv_file)
+
             first_row = pd.read_csv(file_path, nrows=1, **self.reader_settings)
             actual_columns = len(first_row.columns)
             expected_columns = len(self.data_column_names)
 
             if actual_columns != expected_columns:
-                self.logger.error(
-                    f"Column count mismatch in file {file_path}: "
-                    f"Expected {expected_columns} columns, but got {actual_columns} columns."
+                error_message = (
+                    f"Column count mismatch in the uploaded file. "
+                    f"\n Expected {expected_columns} columns, but got {actual_columns} columns."
                 )
-                return pd.DataFrame()
+                raise ColumnMismatch(error_message)  # Raised here, not caught by the same try block
 
             # If column count matches, read the full file
             df = pd.read_csv(filepath_or_buffer=file_path,
                              names=self.data_column_names,
                              **self.reader_settings)
-            self.logger.info(f"Successfully read CSV file: {file_path}")
+            self.logger.info(f"Successfully read CSV file: {file_path.name}")
             return df
-        except FileNotFoundError:
-            self.logger.error(f"CSV file not found: {file_path}")
-        except pd.errors.ParserError as err:
-            self.logger.warning(f"Failed to parse CSV file: {file_path}")
-            self.logger.error(err)
-        except pd.errors.DataError as err:
-            self.logger.warning(f"Data error while reading CSV file: {file_path}")
-            self.logger.error(err)
-        except Exception as err:
-            self.logger.error(f"Unexpected error occurred: {err}")
-        return pd.DataFrame()
+
+        except FileNotFoundError as e:
+            self.logger.error(f"CSV file not found: {csv_file}: {e}")
+            raise ReadCSVError(f"CSV file not found")
+        except pd.errors.ParserError as e:
+            self.logger.error(f"Failed to parse CSV file {file_path.name}: {e}")
+            raise ReadCSVError(f"Failed to parse CSV file {file_path.name}: {e}")
+        except pd.errors.DataError as e:
+            self.logger.error(f"Data error while reading CSV file {csv_file}: {e}")
+            raise ReadCSVError(f"Data error while reading CSV file {file_path.name}: {e}")
+        except ColumnMismatch as e:
+            self.logger.error(f"Column count mismatch in file {file_path.name}: {e}")
+            raise ColumnMismatch(str(e))
+        except Exception as e:
+            self.logger.error(f"Unexpected error occurred while reading {file_path.name}: {e}")
+            raise ReadCSVError(f"Unexpected error occurred while reading {file_path.name}: {e}")
 
     def export_to_csv(self, df: pd.DataFrame, file_name: str) -> Optional[Path]:
         """

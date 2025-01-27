@@ -85,57 +85,57 @@ class TestTGUser:
         except Exception as e:
             pytest.fail(f"Fail to get_info: {e}")
 
-    def test_data_load(self, random_user, csv_worker, data_worker):
+    def test_data_load(self, random_user, csv_worker, user_data):
         try:
             valid_test_csv = get_csv(get_test_data(20))
             df = csv_worker.read_csv(valid_test_csv)
             df = csv_worker.prepare_dataframe(df)
-            data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
-            data_worker.add_data(df)
+            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            user_data.add_data(df)
         except Exception as e:
             pytest.fail(f"Fail to get_info: {e}")
 
-    def test_flush(self, data_worker):
+    def test_flush(self, user_data):
         try:
-            data_worker.flush_data()
+            user_data.flush_data()
         except Exception as e:
             pytest.fail(f"Fail to flush_data: {e}")
 
-    def test_add_record(self,random_user, data_worker,csv_worker):
+    def test_add_record(self,random_user, user_data,csv_worker):
         try:
-            data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
-            data_worker.flush_data()
+            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            user_data.flush_data()
             data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
-            data_worker.add_record(**data)
+            user_data.add_record(**data)
         except Exception as e:
             pytest.fail(f"Fail to add_record: {e}")
 
-    def test_get_record(self, random_user, data_worker, csv_worker):
+    def test_get_record(self, random_user, user_data, csv_worker):
         try:
-            data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
-            data_worker.flush_data()
+            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            user_data.flush_data()
             data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
-            data_worker.add_record(**data)
-            assert data_worker.get_record_by_id("SELECT") is None
-            assert data_worker.get_record_by_id(2) is None
-            assert len(data_worker.get_record_by_id(1)) == len(
-                data_worker.column_names)  # 8 столбцов в таблице с данными
-            data_worker.flush_data()
+            user_data.add_record(**data)
+            assert user_data.get_record_by_id("SELECT") is None
+            assert user_data.get_record_by_id(2) is None
+            assert len(user_data.get_record_by_id(1)) == len(
+                user_data.column_names)  # 8 столбцов в таблице с данными
+            user_data.flush_data()
         except Exception as e:
             pytest.fail(f"Fail get_record: {e}")
 
-    def test_update_record(self, random_user, data_worker, csv_worker):
+    def test_update_record(self, random_user, user_data, csv_worker):
         try:
-            data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
-            data_worker.flush_data()
+            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            user_data.flush_data()
 
             data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
-            data_worker.add_record(**data)
-            data_worker.update_record_by_id(record_id=1, birth_date="1999/01/01")
-            updated_record = data_worker.get_record_by_id(1)
+            user_data.add_record(**data)
+            user_data.update_record_by_id(record_id=1, birth_date="1999/01/01")
+            updated_record = user_data.get_record_by_id(1)
             assert updated_record["birth_date"] == "1999-01-01"
 
-            data_worker.update_record_by_id(record_id=1,
+            user_data.update_record_by_id(record_id=1,
                                             company='TEST COMPANY',
                                             last_name='TEST LAST NAME',
                                             first_name='TEST FIRST NAME',
@@ -143,7 +143,7 @@ class TestTGUser:
                                             gift_category='TEST GIFT CATEGORY',
                                             notice_before_days=99,
                                             birth_date='01/02/2023')
-            updated_record = data_worker.get_record_by_id(1)
+            updated_record = user_data.get_record_by_id(1)
             assert updated_record["company"] == 'TEST COMPANY'
             assert updated_record["last_name"] == 'TEST LAST NAME'
             assert updated_record["first_name"] == 'TEST FIRST NAME'
@@ -151,66 +151,66 @@ class TestTGUser:
             assert updated_record["gift_category"] == 'TEST GIFT CATEGORY'
             assert updated_record["notice_before_days"] == 99
             assert updated_record["birth_date"] == '2023-02-01'
-            data_worker.flush_data()
+            user_data.flush_data()
         except Exception as e:
             pytest.fail(f"Fail get_record: {e}")
 
-    def test_delete_record(self, random_user, data_worker, csv_worker):
+    def test_delete_record(self, random_user, user_data, csv_worker):
         try:
-            data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
-            data_worker.flush_data()
+            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            user_data.flush_data()
 
             # adding record and testing it is there
             data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
-            data_worker.add_record(**data)
-            assert len(data_worker.get_record_by_id(1)) == len(data_worker.column_names)
+            user_data.add_record(**data)
+            assert len(user_data.get_record_by_id(1)) == len(user_data.column_names)
 
             # trying to delete but wrong id - should be 1
-            data_worker.del_record_by_id(record_id=2)
-            assert len(data_worker.get_record_by_id(1)) == len(data_worker.column_names)
+            user_data.del_record_by_id(record_id=2)
+            assert len(user_data.get_record_by_id(1)) == len(user_data.column_names)
 
             # trying to delete but wrong id - string
-            data_worker.del_record_by_id(record_id='i1')
-            assert len(data_worker.get_record_by_id(1)) == len(data_worker.column_names)
+            user_data.del_record_by_id(record_id='i1')
+            assert len(user_data.get_record_by_id(1)) == len(user_data.column_names)
 
             # trying to delete but correct id
-            data_worker.del_record_by_id(record_id=1)
-            updated_record = data_worker.get_record_by_id(1)
+            user_data.del_record_by_id(record_id=1)
+            updated_record = user_data.get_record_by_id(1)
             assert updated_record is None
 
-            data_worker.flush_data()
+            user_data.flush_data()
 
         except Exception as e:
             pytest.fail(f"Fail get_record: {e}")
 
-    def test_data_drop(self, data_worker):
+    def test_data_drop(self, user_data):
         try:
-            data_worker.flush_data()
+            user_data.flush_data()
         except Exception as e:
             pytest.fail(f"Fail to flush_data: {e}")
 
-    def test_full_data_load(self, random_user, csv_worker, data_worker):
+    def test_full_data_load(self, random_user, csv_worker, user_data):
         try:
             valid_test_csv = get_csv(get_test_data(0))
             df = csv_worker.read_csv(valid_test_csv)
             df = csv_worker.prepare_dataframe(df)
-            data_worker.data_tbl_name = "id_" + str(random_user.tg_user_id)
-            data_worker.add_data(df)
+            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            user_data.add_data(df)
         except Exception as e:
             pytest.fail(f"Fail to get_info: {e}")
 
     @freeze_time("2025-08-29 12:00:00")
-    def test_default_reminders(self,  data_worker):
+    def test_default_reminders(self,  user_data):
         test = []
         for i in [0, 1, 3, 7]:
-            if x := data_worker.get_upcoming_dates(i):
+            if x := user_data.get_upcoming_dates(i):
                 test.append(dict_from_row(x))
         print(test)
         assert len(test) == 4, f'Not all records got from test_data{test}'
 
     @freeze_time("2025-12-20 12:00:00")
-    def test_custom_reminders(self, data_worker):
-        data = dict_from_row(data_worker.get_upcoming_dates_custom_column())
+    def test_custom_reminders(self, user_data):
+        data = dict_from_row(user_data.get_upcoming_dates_custom_column())
         assert len(data) == 6
 
     def test_del_info(self, random_user):
