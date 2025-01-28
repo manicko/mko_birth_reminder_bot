@@ -17,6 +17,7 @@ class TestConfig:
     @pytest.mark.parametrize("field, expected_result", [
         ('DATABASE', True),
         ('CSV', True),
+        ('REMINDER', True),
 
     ])
     def test_key_fields(self, config, field, expected_result):
@@ -27,6 +28,9 @@ class TestConfig:
 
     def test_telethon_api_settings(self, config):
         assert len(config.telethon_api_settings) != 0, f"Configuration does not contain telethon api settings"
+
+    def test_reminder_settings(self, config):
+        assert len(config.reminder_settings) != 0, f"Configuration does not contain telethon api settings"
 
 class TestCSVReader:
     def test_read_valid_data(self, csv_worker):

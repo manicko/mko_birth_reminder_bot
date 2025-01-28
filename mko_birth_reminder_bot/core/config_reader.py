@@ -21,6 +21,7 @@ class ConfigReader:
         self.settings = yaml_to_dict(self.config_file)
         self.db_settings = self.settings.get('DATABASE')
         self.csv_settings = self.settings.get('CSV')
+        self.reminder_settings = self.settings.get('REMINDER')
 
         # Logger Settings
         self.log_settings = yaml_to_dict(self.log_config_file)

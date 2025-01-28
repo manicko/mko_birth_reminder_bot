@@ -1,5 +1,7 @@
 import logging
+import asyncio
 from telethon import TelegramClient, events, Button
+from mko_birth_reminder_bot.reminder import start_scheduler, task_to_run
 
 from mko_birth_reminder_bot.core import CONFIG
 
@@ -32,6 +34,10 @@ TELETHON_API = {
 }
 
 DEFAULT_CAPTION = "Повторите попытку введя команду /start"
+
+
+
+
 
 async def save_csv_file(event, upload_dir: str = CONFIG.csv_settings["READ_DATA"]["path"]):
     """
@@ -148,7 +154,6 @@ async def handle_edit_respond(event, text, buttons, rewrite=True):
 
 async def init_user(user_id):
     user_data[user_id] = {}
-    user_data[user_id]['operator']: Operator = Operator(user_id)
     await drop_user_state(user_id)
 
 
@@ -238,7 +243,7 @@ async def handle_callback(event):
 
     data = event.data.decode('utf-8')
 
-    operator: Operator = user_data[user_id]['operator']
+    operator: Operator = Operator(user_id)
 
     match data:
 
@@ -342,7 +347,7 @@ async def handle_text(event):
     if user_id not in user_data:
         await init_user(user_id)
 
-    operator: Operator = user_data[user_id]['operator']
+    operator: Operator = Operator(user_id)
 
     match user_data[user_id]['state']:
         case 'add_record_state':
@@ -384,15 +389,21 @@ async def handle_text(event):
             pass
 
 
-def main():
+async def main():
     """
     The main entry point for running the Telegram bot.
     """
 
-    client.start(bot_token=CONFIG.telethon_api_settings.get('bot_token'))
+    await client.start(bot_token=CONFIG.telethon_api_settings.get('bot_token'))
     logger.info("Telegram bot is running.")
-    client.run_until_disconnected()
+
+    # Запуск планировщика
+    await start_scheduler(client)
+    await task_to_run(client)
+
+
+    await client.run_until_disconnected()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

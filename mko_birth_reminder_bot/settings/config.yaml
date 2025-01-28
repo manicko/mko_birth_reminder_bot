@@ -57,7 +57,14 @@
       [ { "confirm_data": "Подтвердить" } ],
     ]
   },
-
+  "REMINDER": {
+    "timezone": "Europe/Moscow",
+    "trigger": {
+      "hour": 14,
+      "minute": 10
+    },
+    "state_file": "reminder_state.yaml",
+  }
 }
 
 
