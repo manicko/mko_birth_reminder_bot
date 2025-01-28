@@ -83,9 +83,9 @@ def random_user():  # Возвращает логин
 
 
 @pytest.fixture(scope="class")
-def data_worker():
-    with TGUserData() as tmp_data_worker:
-        yield tmp_data_worker
+def user_data():
+    with TGUserData() as tmp_user_data:
+        yield tmp_user_data
 
 
 def get_csv(test_data: List[Dict[str, str]]) -> Path:

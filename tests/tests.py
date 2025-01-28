@@ -5,7 +5,7 @@ from mko_birth_reminder_bot.core import TGUser
 from tests.conftest import get_csv, get_test_data, csv_worker
 from mko_birth_reminder_bot.core.utils import (dict_from_row)
 from .test_data import TestData
-
+import mko_birth_reminder_bot.core.errors as errors
 
 class TestConfig:
     def test_config(self, config):
@@ -97,7 +97,15 @@ class TestTGUser:
             user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
             user_data.add_data(df)
         except Exception as e:
-            pytest.fail(f"Fail to get_info: {e}")
+            pytest.fail(f"Fail to load data: {e}")
+
+    def test_records_count(self, random_user, csv_worker, user_data):
+        try:
+            count = user_data.count_records()
+            print(f"{count} records loaded")
+            assert count == 20, f"{count} records instead of 20"
+        except Exception as e:
+            pytest.fail(f"Fail to get records_count: {e}")
 
     def test_flush(self, user_data):
         try:
@@ -157,7 +165,7 @@ class TestTGUser:
             assert updated_record["birth_date"] == '2023-02-01'
             user_data.flush_data()
         except Exception as e:
-            pytest.fail(f"Fail get_record: {e}")
+            pytest.fail(f"Fail update_record: {e}")
 
     def test_delete_record(self, random_user, user_data, csv_worker):
         try:
@@ -174,8 +182,8 @@ class TestTGUser:
             assert len(user_data.get_record_by_id(1)) == len(user_data.column_names)
 
             # trying to delete but wrong id - string
-            user_data.del_record_by_id(record_id='i1')
-            assert len(user_data.get_record_by_id(1)) == len(user_data.column_names)
+            with pytest.raises(errors.WrongInput):
+                user_data.del_record_by_id(record_id='i1')
 
             # trying to delete but correct id
             user_data.del_record_by_id(record_id=1)
@@ -185,13 +193,13 @@ class TestTGUser:
             user_data.flush_data()
 
         except Exception as e:
-            pytest.fail(f"Fail get_record: {e}")
+            pytest.fail(f"Fail delete_record: {e}")
 
     def test_data_drop(self, user_data):
         try:
             user_data.flush_data()
         except Exception as e:
-            pytest.fail(f"Fail to flush_data: {e}")
+            pytest.fail(f"Fail to data_drop: {e}")
 
     def test_full_data_load(self, random_user, csv_worker, user_data):
         try:
@@ -201,7 +209,7 @@ class TestTGUser:
             user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
             user_data.add_data(df)
         except Exception as e:
-            pytest.fail(f"Fail to get_info: {e}")
+            pytest.fail(f"Fail full_data_load: {e}")
 
     @freeze_time("2025-08-29 12:00:00")
     def test_default_reminders(self,  user_data):

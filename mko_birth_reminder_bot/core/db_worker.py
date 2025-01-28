@@ -188,6 +188,12 @@ class TGUserData(DBWorker):
             # Log any errors that occur
             self.logger.error(f"Error inserting record: {e}")
 
+    def count_records(self) -> int:
+        query = f"""SELECT COUNT(*) FROM {self.data_tbl_name}"""
+        count = self.perform_query(query, fetch='one', raise_exceptions=False)
+        return count[0]
+
+
     def get_all_records(self) -> pd.DataFrame:
         """
         Получает запись из таблицы данных текущего пользователя по id.
