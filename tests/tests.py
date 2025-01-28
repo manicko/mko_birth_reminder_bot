@@ -6,6 +6,7 @@ from tests.conftest import get_csv, get_test_data, csv_worker
 from mko_birth_reminder_bot.core.utils import (dict_from_row)
 from .test_data import TestData
 import mko_birth_reminder_bot.core.errors as errors
+from pathlib import Path
 
 class TestConfig:
     def test_config(self, config):
@@ -211,6 +212,14 @@ class TestTGUser:
         except Exception as e:
             pytest.fail(f"Fail full_data_load: {e}")
 
+    def test_export_data(self, csv_worker, user_data):
+        try:
+            df = user_data.get_all_records()
+            file: Path = csv_worker.export_to_csv(df, 'test.csv')
+            assert file.is_file() == True, f"Failed to create test output file:'test.csv'"
+        except Exception as e:
+            pytest.fail(f"Fail to export_data: {e}")
+
     @freeze_time("2025-08-29 12:00:00")
     def test_default_reminders(self,  user_data):
         test = []
@@ -224,6 +233,8 @@ class TestTGUser:
     def test_custom_reminders(self, user_data):
         data = dict_from_row(user_data.get_upcoming_dates_custom_column())
         assert len(data) == 6
+
+
 
     def test_del_info(self, random_user):
         try:

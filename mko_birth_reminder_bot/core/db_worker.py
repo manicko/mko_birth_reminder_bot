@@ -201,8 +201,9 @@ class TGUserData(DBWorker):
         """
         try:
             query = f"""SELECT * FROM {self.data_tbl_name}"""
-            df = self.perform_query(query, fetch='all', raise_exceptions=True)
-            return pd.DataFrame(df)
+            # df = self.perform_query(query, fetch='all', raise_exceptions=True)
+
+            return pd.read_sql(query,self.db_con)
 
         except Exception as e:
             self.logger.warning(F"Не удалось получить данные из '{self.data_tbl_name}', "
