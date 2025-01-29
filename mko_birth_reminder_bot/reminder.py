@@ -1,21 +1,29 @@
 import pytz
-from pathlib import Path
+import asyncio
 import yaml
 import logging
+from random import randint
+from pathlib import Path
+from prettytable import PrettyTable
 from telethon import TelegramClient
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime, timedelta
-from mko_birth_reminder_bot.core import CONFIG
+from mko_birth_reminder_bot.core import CONFIG, TGUsers, TGUserData
 
 logger = logging.getLogger(__name__)
 
-CHAT_ID = "chat_id"
-MESSAGE = "Ну привет тебе землянин"
 STATE_FILE = Path(CONFIG.reminder_settings["state_file"])
 
 TIMEZONE = CONFIG.reminder_settings["timezone"]
 TRIGGER_ARGS = CONFIG.reminder_settings["trigger"]
+COLUMNS = (
+    'id',
+    # 'company',
+    'last_name',
+    'first_name',
+    # 'gift_category',
+    'birth_date')
 
 
 # Функция для сохранения состояния планировщика
@@ -35,32 +43,89 @@ def load_state():
     return None
 
 
+def beautify_table(data: dict, columns: tuple = COLUMNS) -> str | None:
+    if data:
+        table = PrettyTable()
+        table.field_names = data["header"]
+        table.align = "l"
+
+        for row in sorted(data["items"], key=lambda x: x[-2][-5:]):
+            table.add_row(row)
+
+        return f"``` \n{table.get_string(fields=columns)} ```"
+    return None
+
+
+async def generate_msgs(queue:asyncio.Queue, date: datetime|None = None):
+    tg_users: TGUsers = TGUsers()
+    for user_id in tg_users.iter_ids():
+        user_data: TGUserData = TGUserData(user_id)
+        data = user_data.get_all_reminders(date=date)
+        msg = beautify_table(data)
+        if msg:
+            await queue.put((user_id, msg))
+
+
+async def process_msgs(client: TelegramClient, queue: asyncio.Queue):
+    while True:
+        user_id, msg = await queue.get()
+        await send_message(client, user_id, msg)
+        queue.task_done()
+        await asyncio.sleep(randint(5, 15))
+
+
 # Функция отправки сообщения
 async def send_message(client: TelegramClient, chat_id: str, message: str):
     try:
         await client.send_message(chat_id, message)
-        logging.info(f"Сообщение отправлено: {message}")
+        logging.info(f"Сообщение отправлено")
     except Exception as e:
-        logging.info(f"Ошибка при отправке сообщения: {e}")
+        logging.error(f"Ошибка при отправке сообщения {chat_id}: {e}")
 
 
-# Основная задача для планировщика
-async def task_to_run(client: TelegramClient, chat_id: str = CHAT_ID, message: str = MESSAGE):
+async def main_reminder(client: TelegramClient,date: datetime | None = None):
+    queue = asyncio.Queue()
+    task = asyncio.create_task(process_msgs(client, queue))
+    await generate_msgs(queue,date=date)
+    await queue.join()
+    task.cancel()
+
+
+# # Основная задача для планировщика
+# async def OLD_task_to_run(client: TelegramClient):
+#     tz = pytz.timezone(TIMEZONE)
+#     now = datetime.now(tz)
+#     last_run = load_state() or now
+#     delta = (now - last_run).days
+#     if delta:
+#         next_run_time = last_run + timedelta(days=delta)
+#         logging.info("Пропущено задание. Выполняем с задержкой.")
+#         await main_reminder(client,date=next_run_time)
+#         save_state(next_run_time)
+#         logging.info(f"Пропущенное задание выполнено {next_run_time}.")
+#     await main_reminder(client)
+#     save_state(now)
+
+
+async def check_missed_run(client: TelegramClient):
     tz = pytz.timezone(TIMEZONE)
     now = datetime.now(tz)
-    last_run = load_state()
+    last_run = load_state() or now
+    delta = (now - last_run).days
+    if delta:
+        next_run_time = last_run + timedelta(days=delta)
+        logging.info("Пропущено задание. Выполняем с задержкой.")
+        await main_reminder(client,date=next_run_time)
+        save_state(next_run_time)
+        logging.info(f"Пропущенное задание выполнено {next_run_time}.")
 
-    if last_run:
-        next_run_time = last_run + timedelta(days=1)
-        if now > next_run_time:
-            logging.info("Пропущено задание. Выполняем с задержкой.")
-            await send_message(client, chat_id, message)
-    else:
-        logging.info("Первый запуск задачи.")
 
-    await send_message(client, chat_id, message)
+async def task_to_run(client: TelegramClient):
+    tz = pytz.timezone(TIMEZONE)
+    now = datetime.now(tz)
+    await main_reminder(client)
     save_state(now)
-
+    logging.info("Сообщения отправлены.")
 
 # Настройка планировщика
 async def start_scheduler(client):
@@ -68,4 +133,6 @@ async def start_scheduler(client):
     trigger = CronTrigger(**TRIGGER_ARGS)
     scheduler.add_job(task_to_run, trigger, args=[client])
     scheduler.start()
-    logging.info(f"Планировщик запущен. Следующее сообщение в 11:45 ({TIMEZONE}).")
+    logging.info(f"Планировщик запущен."
+                 f" Следующее сообщение в "
+                 f"{TRIGGER_ARGS['hour']}:{TRIGGER_ARGS['minute']} ({TIMEZONE}).")

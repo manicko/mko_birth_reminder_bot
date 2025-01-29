@@ -1,7 +1,7 @@
 from freezegun import freeze_time
 import pytest
 import sqlite3
-from mko_birth_reminder_bot.core import TGUser
+from mko_birth_reminder_bot.core import TGUsers
 from tests.conftest import get_csv, get_test_data, csv_worker
 from mko_birth_reminder_bot.core.utils import (dict_from_row)
 from .test_data import TestData
@@ -84,7 +84,7 @@ class TestTGUser:
         try:
             info = random_user.get_info()
             assert isinstance(info, sqlite3.Row) is True, f"Info is not a dict: {info}"
-            assert set(TGUser.TABLE_FIELDS.keys()) == set(info.keys())
+            assert set(TGUsers.TABLE_FIELDS.keys()) == set(info.keys())
             assert ('tg_user_id' in set(info.keys())) == True
             assert info['tg_user_id'] == random_user.tg_user_id
         except Exception as e:
@@ -95,7 +95,7 @@ class TestTGUser:
             valid_test_csv = get_csv(get_test_data(20))
             df = csv_worker.read_csv(valid_test_csv)
             df = csv_worker.prepare_dataframe(df)
-            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            # user_data.data_tbl_name = random_user.tg_user_id
             user_data.add_data(df)
         except Exception as e:
             pytest.fail(f"Fail to load data: {e}")
@@ -116,7 +116,7 @@ class TestTGUser:
 
     def test_add_record(self,random_user, user_data,csv_worker):
         try:
-            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            # user_data._data_tbl_name = random_user.tg_user_id
             user_data.flush_data()
             data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
             user_data.add_record(**data)
@@ -125,7 +125,7 @@ class TestTGUser:
 
     def test_get_record(self, random_user, user_data, csv_worker):
         try:
-            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            # user_data._data_tbl_name = random_user.tg_user_id
             user_data.flush_data()
             data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
             user_data.add_record(**data)
@@ -139,7 +139,7 @@ class TestTGUser:
 
     def test_update_record(self, random_user, user_data, csv_worker):
         try:
-            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            # user_data._data_tbl_name = random_user.tg_user_id
             user_data.flush_data()
 
             data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
@@ -170,7 +170,7 @@ class TestTGUser:
 
     def test_delete_record(self, random_user, user_data, csv_worker):
         try:
-            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            # user_data._data_tbl_name = "id_" + str(random_user.tg_user_id)
             user_data.flush_data()
 
             # adding record and testing it is there
@@ -207,7 +207,7 @@ class TestTGUser:
             valid_test_csv = get_csv(get_test_data(0))
             df = csv_worker.read_csv(valid_test_csv)
             df = csv_worker.prepare_dataframe(df)
-            user_data.data_tbl_name = "id_" + str(random_user.tg_user_id)
+            # user_data._data_tbl_name = random_user.tg_user_id
             user_data.add_data(df)
         except Exception as e:
             pytest.fail(f"Fail full_data_load: {e}")
@@ -224,17 +224,15 @@ class TestTGUser:
     def test_default_reminders(self,  user_data):
         test = []
         for i in [0, 1, 3, 7]:
-            if x := user_data.get_upcoming_dates(i):
+            if x := user_data._get_upcoming_dates(i):
                 test.append(dict_from_row(x))
         print(test)
         assert len(test) == 4, f'Not all records got from test_data{test}'
 
     @freeze_time("2025-12-20 12:00:00")
     def test_custom_reminders(self, user_data):
-        data = dict_from_row(user_data.get_upcoming_dates_custom_column())
+        data = dict_from_row(user_data._get_upcoming_dates_custom_column())
         assert len(data) == 6
-
-
 
     def test_del_info(self, random_user):
         try:

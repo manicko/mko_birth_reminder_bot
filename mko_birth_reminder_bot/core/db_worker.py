@@ -4,9 +4,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
 from .config_reader import CONFIG
-from .utils import data_validation
+from .utils import data_validation, dict_from_row
 import logging
 from .errors import *
+
 
 class DBWorker:
     DATA_TO_SQL_PARAMS = {
@@ -60,7 +61,7 @@ class DBWorker:
                 case _:
                     result = None
             self.db_con.commit()
-            self.logger.info(f"Запрос выполнен: {query}, параметры: {term}, результат: {result}")
+            self.logger.debug(f"Запрос выполнен: {query}, параметры: {term}, результат: {result}")
             return result
         except sqlite3.Error as err:
             self.logger.error(f"Ошибка при выполнении запроса: '{query}' с параметрами {term}. Ошибка: {err}")
@@ -87,7 +88,7 @@ class DBWorker:
         """
         query = f"DROP TABLE IF EXISTS {table_name}"
         if self.perform_query(query):
-            self.logger.info(f"Таблица '{table_name}' успешно удалена.")
+            self.logger.debug(f"Таблица '{table_name}' успешно удалена.")
             return True
         return False
 
@@ -113,15 +114,28 @@ class DBWorker:
 class TGUserData(DBWorker):
     """Класс для работы с данными пользователей."""
 
-    def __init__(self, data_tbl_name: str | None = None):
+    def __init__(self, tg_user_id: int | None):
         super().__init__()
         self.columns = self.db_settings['columns']
         self.column_names = list(self.columns.keys())
         self.date_column = self.db_settings['date_column']
         self.date_format = self.db_settings["date_format"]  # %d/%m/%y
-
+        self.default_notice = self.db_settings['default_notice']
+        self._data_tbl_name = None
         self.notice_before_days_column = self.db_settings['custom_notice_column']
-        self.data_tbl_name = data_tbl_name
+        if tg_user_id:
+            self.data_tbl_name = tg_user_id
+
+    @property
+    def data_tbl_name(self):
+        return self._data_tbl_name
+
+    @data_tbl_name.setter
+    def data_tbl_name(self, tg_user_id):
+        try:
+            self._data_tbl_name = 'id_' + str(tg_user_id)
+        except TypeError as e:
+            self.logger.error(f"Parameter tg_user_id should be integer. {e}")
 
     def add_data(self, prepared_data: pd.DataFrame, sql_loader_settings: Optional[Dict[str, Any]] = None) -> int:
         """Добавляет данные в таблицу."""
@@ -129,7 +143,7 @@ class TGUserData(DBWorker):
             sql_loader_settings = DBWorker.DATA_TO_SQL_PARAMS
         prepared_data.to_sql(
             **sql_loader_settings,
-            name=self.data_tbl_name,
+            name=self._data_tbl_name,
             con=self.db_con
         )
         self.logger.info(f"Добавлено {prepared_data.shape[0]} записей.")
@@ -137,8 +151,8 @@ class TGUserData(DBWorker):
 
     def flush_data(self):
         """"""
-        self.drop_table(self.data_tbl_name)
-        self.create_table(self.data_tbl_name, self.columns)
+        self.drop_table(self._data_tbl_name)
+        self.create_table(self._data_tbl_name, self.columns)
 
     def add_record(self, **data) -> None:
         """
@@ -180,7 +194,7 @@ class TGUserData(DBWorker):
                 key_str = ', '.join(valid_data.keys())
                 q_str = ', '.join(['?'] * len(valid_data.keys()))
                 values = tuple(valid_data.values())
-                query = f"INSERT INTO {self.data_tbl_name} ({key_str}) VALUES ({q_str})"
+                query = f"INSERT INTO {self._data_tbl_name} ({key_str}) VALUES ({q_str})"
 
                 # Execute the query
                 self.perform_query(query, values)
@@ -189,10 +203,9 @@ class TGUserData(DBWorker):
             self.logger.error(f"Error inserting record: {e}")
 
     def count_records(self) -> int:
-        query = f"""SELECT COUNT(*) FROM {self.data_tbl_name}"""
+        query = f"""SELECT COUNT(*) FROM {self._data_tbl_name}"""
         count = self.perform_query(query, fetch='one', raise_exceptions=False)
         return count[0]
-
 
     def get_all_records(self) -> pd.DataFrame:
         """
@@ -200,13 +213,13 @@ class TGUserData(DBWorker):
 
         """
         try:
-            query = f"""SELECT * FROM {self.data_tbl_name}"""
+            query = f"""SELECT * FROM {self._data_tbl_name}"""
             # df = self.perform_query(query, fetch='all', raise_exceptions=True)
 
-            return pd.read_sql(query,self.db_con)
+            return pd.read_sql(query, self.db_con)
 
         except Exception as e:
-            self.logger.warning(F"Не удалось получить данные из '{self.data_tbl_name}', "
+            self.logger.warning(F"Не удалось получить данные из '{self._data_tbl_name}', "
                                 F"из-за ошибки: '{e}' ")
             return pd.DataFrame()
 
@@ -218,7 +231,7 @@ class TGUserData(DBWorker):
         """
         try:
             row_id = int(record_id)
-            query = f"""SELECT * FROM {self.data_tbl_name} WHERE id = ?"""
+            query = f"""SELECT * FROM {self._data_tbl_name} WHERE id = ?"""
             return self.perform_query(query, (row_id,), fetch='one')
         except ValueError:
             self.logger.warning(F"Недопустимый id записи: '{record_id}', id должен быть integer")
@@ -256,13 +269,9 @@ class TGUserData(DBWorker):
             values = list(validated_data.values())
             values.append(record_id)  # Append the record ID as the last parameter
 
-            # Prepare the query string
-            query = f"UPDATE {self.data_tbl_name} SET {fields_assignment} WHERE id = ?"
-
-            # Execute the query
+            query = f"UPDATE {self._data_tbl_name} SET {fields_assignment} WHERE id = ?"
             self.perform_query(query, values, fetch=None)
         except (ValueError, AttributeError) as e:
-            # Log errors and return
             self.logger.error(f"Error updating record with ID {record_id}: {e}")
 
     def del_record_by_id(self, record_id: int) -> None:
@@ -294,11 +303,11 @@ class TGUserData(DBWorker):
         except ValueError as e:
             # Log the error if conversion fails
             self.logger.error(f"Invalid record ID: must be an integer. Error: {e}, Provided: {record_id}")
-            raise  WrongInput(f"Invalid record ID: must be an integer. Provided: {record_id}")
+            raise WrongInput(f"Invalid record ID: must be an integer. Provided: {record_id}")
         else:
             try:
                 # Construct the SQL DELETE query
-                query = f"DELETE FROM {self.data_tbl_name} WHERE id = ?"
+                query = f"DELETE FROM {self._data_tbl_name} WHERE id = ?"
                 # Execute the query
                 self.perform_query(query, (record_id,), raise_exceptions=True)
                 # Optional: Log successful deletion
@@ -308,9 +317,8 @@ class TGUserData(DBWorker):
                 self.logger.error(f"Error deleting record with ID {record_id}: {e}")
                 raise f"Error deleting record with ID {record_id}"
 
-    def get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[
+    def _get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[
         Union[List[sqlite3.Row], sqlite3.Row]]:
-
         """Возвращает данные в диапазоне дат.
 
         :param start_date: Начальная дата (DD/MM/YYYY).
@@ -324,7 +332,7 @@ class TGUserData(DBWorker):
         start_month_day = (start_date.month, start_date.day)
         end_month_day = (end_date.month, end_date.day)
         # SQL-запрос для выборки по диапазону
-        query = f"SELECT {', '.join(self.column_names)} FROM {self.data_tbl_name} WHERE "
+        query = f"SELECT {', '.join(self.column_names)} FROM {self._data_tbl_name} WHERE "
         if start_month_day <= end_month_day:
             # Диапазон в пределах одного года
             query += f"strftime('%m-%d', {self.date_column}) BETWEEN ? AND ?"
@@ -343,7 +351,7 @@ class TGUserData(DBWorker):
                 f"{end_month_day[0]:02d}-{end_month_day[1]:02d}",
             )
         """
-        #    SELECT * FROM {self.data_tbl_name}
+        #    SELECT * FROM {self._data_tbl_name}
         #    WHERE 
         #        (strftime('%m-%d', DATE({self.date_column})) BETWEEN strftime('%m-%d', ?) AND strftime('%m-%d', ?))
         #        OR 
@@ -352,13 +360,15 @@ class TGUserData(DBWorker):
         # (query, (start_date, end_date, end_date, start_date, end_date))
         return self.perform_query(query, params, fetch='all')
 
-    def get_upcoming_dates(self, notice_period_days: int = 0) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
+    def _get_upcoming_dates(self, notice_period_days: int = 0, date: datetime | None = None) -> Optional[
+        Union[List[sqlite3.Row], sqlite3.Row]]:
         """
         Fetch users whose birthdays match their 'notice_period_days' days from the current date.
         :return: List of users with matching birthdays.
         """
         try:
-            target_date = datetime.now() + timedelta(days=int(notice_period_days))
+            current_date = date or datetime.now()
+            target_date = current_date + timedelta(days=int(notice_period_days))
 
             target_date_str = target_date.strftime('%m-%d')
         except ValueError as err:
@@ -366,22 +376,22 @@ class TGUserData(DBWorker):
             return []
         else:
             query = f"""
-                    SELECT * FROM {self.data_tbl_name}
+                    SELECT * FROM {self._data_tbl_name}
                     WHERE strftime('%m-%d', {self.date_column}) = ?
                     """
             return self.perform_query(query, (target_date_str,), fetch='all')
 
-    def get_upcoming_dates_custom_column(self):
+    def _get_upcoming_dates_custom_column(self, date: datetime | None = None):
         """
         Fetch users whose birthdays match their 'notice_before' days from the current date.
         :return: List of users with matching birthdays.
         """
 
-        current_date = datetime.now().strftime('%Y-%m-%d')
-
+        current_date = date or datetime.now()
+        current_date = current_date.strftime('%Y-%m-%d')
         # SQL query with dynamic table and column names
         query = f"""
-        SELECT * FROM {self.data_tbl_name}
+        SELECT * FROM {self._data_tbl_name}
         WHERE 
             strftime('%m-%d', {self.date_column}) = 
             strftime('%m-%d', DATE(?, '+' || {self.notice_before_days_column} || ' days'))
@@ -389,14 +399,57 @@ class TGUserData(DBWorker):
 
         return self.perform_query(query, (current_date,), fetch='all')
 
+    def get_default_reminders(self, date: datetime | None = None) -> list:
+        default_reminders = []
+        for i in self.default_notice:
+            if row := self._get_upcoming_dates(notice_period_days=i, date=date):
+                default_reminders.extend(dict_from_row(row))
+        return default_reminders
 
-class TGUser(DBWorker):
+    def get_custom_reminders(self, date: datetime | None = None) -> list:
+        return dict_from_row(self._get_upcoming_dates_custom_column(date))
+
+    def get_all_reminders(self, date: datetime | None = None) -> dict:
+        all_reminders = {}
+        reminders = self.get_default_reminders(date) + self.get_custom_reminders(date)
+        if reminders:
+            all_reminders["header"] = list(reminders[0].keys())
+            all_reminders['items'] = list(set(tuple(row.values()) for row in reminders))
+
+        return all_reminders
+
+
+class TGUsers(DBWorker):
     TABLE_NAME = 'tg_users'
     TABLE_FIELDS = {
         'tg_user_id': 'INTEGER PRIMARY KEY',
         'last_interaction_date': 'TEXT',
         'notify_before_days': 'INTEGER',
     }
+
+    def __init__(self):
+        super().__init__()
+        self._id_column = 'tg_user_id'
+
+    def _get_all_tg_ids(self):
+        """
+        Получает все id из таблицы пользователей.
+        """
+        query = f"""SELECT {self._id_column} FROM {TGUsers.TABLE_NAME}"""
+        return self.perform_query(query, fetch='all', raise_exceptions=False)
+
+    def iter_ids(self):
+        for record in self._get_all_tg_ids():
+            yield record['tg_user_id']
+
+
+class TGUser(DBWorker):
+    # TABLE_NAME = 'tg_users'
+    # TABLE_FIELDS = {
+    #     'tg_user_id': 'INTEGER PRIMARY KEY',
+    #     'last_interaction_date': 'TEXT',
+    #     'notify_before_days': 'INTEGER',
+    # }
 
     def __init__(self, tg_user_id: int):
         super().__init__()
@@ -440,11 +493,11 @@ class TGUser(DBWorker):
         :param field_name: Название столбца, значение которого нужно получить.
         :return: Значение указанного поля или None, если данных нет.
         """
-        if field_name not in TGUser.TABLE_FIELDS:
+        if field_name not in TGUsers.TABLE_FIELDS:
             self.logger.error(f"Попытка получить недопустимое поле: {field_name}")
             return None
 
-        query = f"SELECT {field_name} FROM {TGUser.TABLE_NAME} WHERE tg_user_id = ?"
+        query = f"SELECT {field_name} FROM {TGUsers.TABLE_NAME} WHERE tg_user_id = ?"
         result = self.perform_query(query, (self._tg_user_id,), fetch='one')
         return result[field_name]
 
@@ -456,10 +509,10 @@ class TGUser(DBWorker):
         :param field_value: Новое значение для столбца.
         :return: True, если обновление прошло успешно, иначе False.
         """
-        if field_name not in TGUser.TABLE_FIELDS:
+        if field_name not in TGUsers.TABLE_FIELDS:
             self.logger.error(f"Попытка обновить недопустимое поле: {field_name}")
             return None
-        query = f"""UPDATE {TGUser.TABLE_NAME} SET {field_name} = ? WHERE tg_user_id = ?"""
+        query = f"""UPDATE {TGUsers.TABLE_NAME} SET {field_name} = ? WHERE tg_user_id = ?"""
         return self.perform_query(query, (field_value, self._tg_user_id), fetch=None)
 
     def update_last_interaction_date(self):
@@ -472,7 +525,7 @@ class TGUser(DBWorker):
         и создает пустую таблицу в базе для данных загружаемых пользователем.
        """
         # SQL-запрос для вставки данных
-        query = f"""INSERT INTO {TGUser.TABLE_NAME} 
+        query = f"""INSERT INTO {TGUsers.TABLE_NAME} 
                      (tg_user_id, last_interaction_date, notify_before_days)
                      VALUES (?, ?, ?)
                 """
@@ -484,7 +537,7 @@ class TGUser(DBWorker):
         Проверяет наличие строки в базе данных по tg_user_id и возвращает эту строку.
         :return: Кортеж с данными строки, если строка найдена. None, если строки нет.
         """
-        query = f"SELECT * FROM {TGUser.TABLE_NAME} WHERE tg_user_id = ?"
+        query = f"SELECT * FROM {TGUsers.TABLE_NAME} WHERE tg_user_id = ?"
         return self.perform_query(query, (self._tg_user_id,), fetch='one')
 
     def add_data_table(self):
@@ -498,7 +551,7 @@ class TGUser(DBWorker):
         Удаляет запись о пользователе из таблицы пользователей,
          а также удаляет связанную с ним таблицу с данными
        """
-        query = f"DELETE FROM {TGUser.TABLE_NAME} WHERE tg_user_id = ?"
+        query = f"DELETE FROM {TGUsers.TABLE_NAME} WHERE tg_user_id = ?"
         self.perform_query(query, (self._tg_user_id,), fetch='one')
         self.drop_table(f'id_{str(self._tg_user_id)}')
 

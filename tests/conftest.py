@@ -1,6 +1,9 @@
 import pytest
 import random
 from pathlib import Path
+
+from rsa.pkcs1 import yield_fixedblocks
+
 from mko_birth_reminder_bot.core import CSVWorker, TGUser, TGUserData, CONFIG
 import faker
 import pandas as pd
@@ -13,8 +16,8 @@ from .test_data import TestData
 def config():
     return CONFIG
 
-
-def random_user_id():
+@pytest.fixture(scope="module")
+def random_user_id()->int:
     return random.randrange(10 ** 11, 10 ** 12)
 
 def get_test_data(num_records: int = 1, valid = True) -> list:
@@ -74,17 +77,18 @@ def csv_worker():
         yield tmp_csv_worker
 
 
+
 @pytest.fixture(scope="class")
-def random_user():  # Возвращает логин
-    with TGUser(random_user_id()) as tmp_user_worker:
+def random_user(random_user_id):  # Возвращает логин
+    with TGUser(random_user_id) as tmp_user_worker:
         yield tmp_user_worker
         # удаляем пользователя из базы в любом случае
         tmp_user_worker.del_info()
 
 
 @pytest.fixture(scope="class")
-def user_data():
-    with TGUserData() as tmp_user_data:
+def user_data(random_user_id):
+    with TGUserData(random_user_id) as tmp_user_data:
         yield tmp_user_data
 
 

@@ -1,12 +1,6 @@
 import logging
-from mko_birth_reminder_bot.core.errors import *
-from mko_birth_reminder_bot.core import (utils,
-                                         CONFIG,
-                                         DBWorker,
-                                         TGUserData,
-                                         TGUser,
-                                         CSVWorker)
-
+from mko_birth_reminder_bot.core import *
+from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
@@ -14,14 +8,13 @@ class Operator:
     def __init__(self, user_id):
         self.user_id = int(user_id)
         self.user = TGUser(self.user_id)
-        self.user_data = TGUserData()
+        self.user_data = TGUserData(self.user_id)
         self.csv_worker = CSVWorker()
         self.user_init()
 
     def user_init(self, ):
         if self.user.is_exist is False:
             self.user.add_info()
-        self.user_data.data_tbl_name = "id_" + str(self.user_id)
 
     def import_data(self, csv_file):
         try:
@@ -69,5 +62,5 @@ class Operator:
     def del_info(self):
         self.user.del_info()
 
-    def __del__(self):
-        pass
+    def remove_tmp_file(self, file:Path):
+        self.csv_worker.safe_file_delete(file)

@@ -12,6 +12,7 @@
       'birth_date': 'TEXT NOT NULL',
       'notice_before_days': 'INTEGER',
     },
+    "default_notice":[0,1,2,3,5,7,14],
     "custom_notice_column": 'notice_before_days',
     "date_column": 'birth_date',
     "date_format": '%Y-%m-%d' # only works if you respect the ISO8601 notation: YYYY-MM-DD

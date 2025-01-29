@@ -1,10 +1,9 @@
 import logging
 import asyncio
 from telethon import TelegramClient, events, Button
-from mko_birth_reminder_bot.reminder import start_scheduler, task_to_run
+from mko_birth_reminder_bot.reminder import start_scheduler, check_missed_run
 
 from mko_birth_reminder_bot.core import CONFIG
-
 from mko_birth_reminder_bot.operator import Operator
 
 logger = logging.getLogger(__name__)
@@ -41,7 +40,7 @@ async def save_csv_file(event, upload_dir: str = CONFIG.csv_settings["READ_DATA"
     Сохраняет загруженный пользователем CSV-файл в указанную папку.
 
     Параметры:
-        event: событие Telethon.
+        event: Событие Telethon.
         upload_dir: путь к папке для сохранения файла.
     Возвращает:
         str: Путь к сохраненному файлу или сообщение об ошибке.
@@ -73,10 +72,10 @@ def get_csv_prompt(columns: dict = CONFIG.db_settings["columns"],
               f"\n        - строго соблюдайте количество и порядок полей"
               f"\n        - в качестве разделителя полей используйте `'{sep}'`"
               f"\n        - формат даты должен быть `'dd/mm/yyyy'` или `'dd.mm.yyyy'`"
-              f"\n\n💡 **Если для загрузки вы используете ранее выгруженный файл:**"
+              f"\n\n❗️ **Если для загрузки вы используете ранее выгруженный файл:**"
               f"\n        - удалите столбец `id`\n"
               f"\n        - очистите записи перед загрузкой, чтобы они не дублировались"
-              f"\n\n🔍 **Вот пример корректного заполнения:**"
+              f"\n\n💡 **Вот пример корректного заполнения:**"
               f"```{csv_ex}```" )
 
     return prompt
@@ -294,6 +293,7 @@ async def handle_callback(event):
             if file:
                 caption = "Вот файл с вашими данными в формате CSV."
                 await client.send_file(event.chat_id, file, caption=caption)
+                await asyncio.to_thread(operator.remove_tmp_file(file))
             else:
                 caption = f"Не удалось выгрузить файл, "
                 f"обратитесь за помощью к разработчикам."
@@ -400,7 +400,7 @@ async def main():
 
     # Запуск планировщика
     await start_scheduler(client)
-    await task_to_run(client)
+    await check_missed_run(client)
 
     await client.run_until_disconnected()
 

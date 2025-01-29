@@ -1,8 +1,8 @@
 import logging
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Optional
 import pandas as pd
-
+from datetime import datetime, timedelta
 from .errors import *
 from .utils import (get_date, get_text)
 from .config_reader import CONFIG
@@ -102,9 +102,8 @@ class CSVWorker:
 
     ####################         data processing            ####################
     @staticmethod
-    def _get_columns(columns:dict) -> List[str]:
-                return [col_name for col_name, col_type in columns.items() if 'PRIMARY' not in col_type]
-
+    def _get_columns(columns: dict) -> List[str]:
+        return [col_name for col_name, col_type in columns.items() if 'PRIMARY' not in col_type]
 
     def _clean_date_column(self, dataframe: pd.DataFrame, date_column: str) -> pd.DataFrame:
         """
@@ -164,20 +163,33 @@ class CSVWorker:
         self.logger.info(f"Skipped rows: {len_raw_data - len(dataframe)}.")
         return dataframe
 
-    def cleanup(self) -> None:
+    def cleanup_tmp(self, days_older: int = 3) -> None:
         """
-        Removes files from the export directory if 'keep_files' is False.
+        Removes files older that days_older from the export directory if 'keep_files' is False.
         """
         if not self.keep_files:
+            cutoff_date = datetime.now() - timedelta(days=days_older)
+
             for file in self.export_path.glob("*"):
-                try:
-                    file.unlink()
-                    self.logger.info(f"File {file} deleted successfully.")
-                except Exception as e:
-                    self.logger.error(f"Failed to delete file {file}: {e}")
+                if (file.is_file() and
+                        datetime.fromtimestamp(file.stat().st_mtime) < cutoff_date):
+                    self.safe_file_delete(file)
+
+    def safe_file_delete(self, file: Path) -> None:
+        """
+        Removes file using its Path.
+        """
+        try:
+            file.unlink()
+            self.logger.info(f"File {file} deleted successfully.")
+        except Exception as e:
+            self.logger.error(f"Failed to delete file {file}: {e}")
 
     def __enter__(self) -> "CSVWorker":
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.cleanup()
+        self.cleanup_tmp()
+
+    def __del__(self):
+        self.cleanup_tmp()
