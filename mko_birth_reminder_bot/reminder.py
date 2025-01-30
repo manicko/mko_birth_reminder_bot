@@ -13,7 +13,7 @@ from mko_birth_reminder_bot.core import CONFIG, TGUsers, TGUserData
 
 logger = logging.getLogger(__name__)
 
-STATE_FILE = Path(CONFIG.reminder_settings["state_file"])
+STATE_FILE = CONFIG.reminder_settings["state_file"]
 
 TIMEZONE = CONFIG.reminder_settings["timezone"]
 TRIGGER_ARGS = CONFIG.reminder_settings["trigger"]

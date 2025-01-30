@@ -23,7 +23,7 @@
       "class": "logging.StreamHandler",
       # This is the formatter name declared above
       "formatter": "basic",
-      "level": "ERROR",
+      "level": "INFO",
       # The default is stderr
       "stream": "ext://sys.stdout"
     },
@@ -33,7 +33,7 @@
       "class": "logging.handlers.RotatingFileHandler",
       "level": "INFO",
       "formatter": "basic",
-      "filename": "C:/py_exp/mko_birth_reminder_bot/mko_birth_reminder_bot/logs/log.log",
+      "filename": "logs/log.log",
       "maxBytes": 5242880,
       "backupCount": 2,
       "encoding": "utf-8"

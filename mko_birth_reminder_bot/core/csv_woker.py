@@ -4,7 +4,7 @@ from typing import List, Optional
 import pandas as pd
 from datetime import datetime, timedelta
 from .errors import *
-from .utils import (get_date, get_text)
+from .utils import (get_date, get_text, get_dir_content)
 from .config_reader import CONFIG
 
 
@@ -163,16 +163,14 @@ class CSVWorker:
         self.logger.info(f"Skipped rows: {len_raw_data - len(dataframe)}.")
         return dataframe
 
-    def cleanup_tmp(self, days_older: int = 3) -> None:
+    def cleanup_tmp(self, days_older: int = 3, ext: set = ('csv', 'txt')) -> None:
         """
         Removes files older that days_older from the export directory if 'keep_files' is False.
         """
         if not self.keep_files:
             cutoff_date = datetime.now() - timedelta(days=days_older)
-
-            for file in self.export_path.glob("*"):
-                if (file.is_file() and
-                        datetime.fromtimestamp(file.stat().st_mtime) < cutoff_date):
+            for file in get_dir_content(self.import_path, ext):
+                if datetime.fromtimestamp(file.stat().st_mtime) < cutoff_date:
                     self.safe_file_delete(file)
 
     def safe_file_delete(self, file: Path) -> None:

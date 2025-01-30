@@ -1,6 +1,6 @@
 {
   "DATABASE": {
-    "path": "C:/py_exp/mko_birth_reminder_bot/mko_birth_reminder_bot/data",
+    "path": "data",
     "db_file": "birthdays.db",
     "columns": {
       'id': 'INTEGER PRIMARY KEY AUTOINCREMENT',
@@ -19,7 +19,7 @@
   },
   'CSV':
     { 'READ_DATA': { # general settings for pandas CSV reader
-      "path": "C:/py_exp/mko_birth_reminder_bot/mko_birth_reminder_bot/tmp",
+      "path": "tmp",
       'from_csv': {
         'sep': ';',
         'on_bad_lines': 'skip',
@@ -30,7 +30,7 @@
       }
     },
       'EXPORT_DATA': {
-        "path": "C:/py_exp/mko_birth_reminder_bot/mko_birth_reminder_bot/tmp",
+        "path": "tmp",
         'to_csv': { # general settings for pandas CSV reader
           'sep': ';',
           'encoding': 'utf-8',
@@ -61,8 +61,8 @@
   "REMINDER": {
     "timezone": "Europe/Moscow",
     "trigger": {
-      "hour": 14,
-      "minute": 10
+      "hour": 15,
+      "minute": 50
     },
     "state_file": "reminder_state.yaml",
   }

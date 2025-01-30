@@ -46,8 +46,10 @@ class TestCSVReader:
 
     def test_read_wrong_columns_data(self, csv_worker):
         valid_test_csv = get_csv(TestData.invalid_data_wrong_col_num)
-        df = csv_worker.read_csv(valid_test_csv)
-        assert len(df) == 0
+        with pytest.raises(errors.ColumnMismatch):
+            df = csv_worker.read_csv(valid_test_csv)
+
+
 
     def test_read_invalid_valid_data(self, csv_worker):
         try:

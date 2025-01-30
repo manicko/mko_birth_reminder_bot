@@ -1,9 +1,6 @@
 import pytest
 import random
 from pathlib import Path
-
-from rsa.pkcs1 import yield_fixedblocks
-
 from mko_birth_reminder_bot.core import CSVWorker, TGUser, TGUserData, CONFIG
 import faker
 import pandas as pd
