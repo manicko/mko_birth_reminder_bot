@@ -78,7 +78,6 @@ async def process_msgs(client: TelegramClient, queue: asyncio.Queue):
 async def send_message(client: TelegramClient, chat_id: str, message: str):
     try:
         await client.send_message(chat_id, message)
-        logging.info(f"Сообщение отправлено")
     except Exception as e:
         logging.error(f"Ошибка при отправке сообщения {chat_id}: {e}")
 
@@ -89,23 +88,6 @@ async def main_reminder(client: TelegramClient,date: datetime | None = None):
     await generate_msgs(queue,date=date)
     await queue.join()
     task.cancel()
-
-
-# # Основная задача для планировщика
-# async def OLD_task_to_run(client: TelegramClient):
-#     tz = pytz.timezone(TIMEZONE)
-#     now = datetime.now(tz)
-#     last_run = load_state() or now
-#     delta = (now - last_run).days
-#     if delta:
-#         next_run_time = last_run + timedelta(days=delta)
-#         logging.info("Пропущено задание. Выполняем с задержкой.")
-#         await main_reminder(client,date=next_run_time)
-#         save_state(next_run_time)
-#         logging.info(f"Пропущенное задание выполнено {next_run_time}.")
-#     await main_reminder(client)
-#     save_state(now)
-
 
 async def check_missed_run(client: TelegramClient):
     tz = pytz.timezone(TIMEZONE)

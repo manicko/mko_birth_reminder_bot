@@ -34,7 +34,7 @@
       "level": "INFO",
       "formatter": "basic",
       "filename": "logs/log.log",
-      "maxBytes": 5242880,
+      "maxBytes": 2000000,
       "backupCount": 2,
       "encoding": "utf-8"
     }

@@ -180,6 +180,7 @@ cython_debug/
 /logs/*
 /tmp/*
 *secrets.yaml
+!default_secrets.yaml
 *.csv
 *token.json
 *.session*

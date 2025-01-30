@@ -1,11 +1,11 @@
-from mko_birth_reminder_bot.core import CSVWorker,DBWorker, TGUser, TGUserData, CONFIG
-import mko_birth_reminder_bot.core.logger
+from mko_birth_reminder_bot.core import DBWorker, TGUsers
+
 
 
 
 def init():
     with DBWorker() as db_worker:
-        db_worker.create_table(TGUser.TABLE_NAME, TGUser.TABLE_FIELDS)
+        db_worker.create_table(TGUsers.TABLE_NAME, TGUsers.TABLE_FIELDS)
 
 
 
