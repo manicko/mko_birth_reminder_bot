@@ -8,34 +8,36 @@ from mko_birth_reminder_bot.operator import Operator
 
 logger = logging.getLogger(__name__)
 
-client = TelegramClient(**CONFIG.telethon_api_settings['client'])
+client = TelegramClient(**CONFIG.TELETHON_API.client)
+
+
 
 # Словарь для временного хранения данных пользователей
 user_data = {}
-
-TELETHON_API = {
-    "start_menu": [
-        [{"add_record": "Добавить запись"}],
-        [{"update_record_by_id": "Исправить по id"},
-         {"delete_record_by_id": "Удалить по id"}],
-        [{"import_csv": "Импорт из CSV"}, {"export_csv": "Экспорт в CSV"}],
-        [{"delete_user": "Отписаться"}],
-    ],
-    "add_record_menu": [
-        [{"back_to_start": "Назад"}],
-        [{"first_name": "Имя"}, {"last_name": "Фамилия"}],
-        [{"company": "Компания"}, {"position": "Должность"}],
-        [{"gift_category": "Категория подарка"}],
-        [{"birth_date": "День рождения в формате ДД.ММ.ГГГГ"}],
-        [{"notice_before_days": "За сколько дней предупредить"}],
-        [{"confirm_record": "Подтвердить"}]
-    ]
-}
+#
+# TELETHON_API = {
+#     "start_menu": [
+#         [{"add_record": "Добавить запись"}],
+#         [{"update_record_by_id": "Исправить по id"},
+#          {"delete_record_by_id": "Удалить по id"}],
+#         [{"import_csv": "Импорт из CSV"}, {"export_csv": "Экспорт в CSV"}],
+#         [{"delete_user": "Отписаться"}],
+#     ],
+#     "add_record_menu": [
+#         [{"back_to_start": "Назад"}],
+#         [{"first_name": "Имя"}, {"last_name": "Фамилия"}],
+#         [{"company": "Компания"}, {"position": "Должность"}],
+#         [{"gift_category": "Категория подарка"}],
+#         [{"birth_date": "День рождения в формате ДД.ММ.ГГГГ"}],
+#         [{"notice_before_days": "За сколько дней предупредить"}],
+#         [{"confirm_record": "Подтвердить"}]
+#     ]
+# }
 
 DEFAULT_CAPTION = "Повторите попытку введя команду /start"
 
 
-async def save_csv_file(event, upload_dir: str = CONFIG.csv_settings["READ_DATA"]["path"]):
+async def save_csv_file(event, upload_dir: str = CONFIG.CSV.READ_DATA.path):
     """
     Сохраняет загруженный пользователем CSV-файл в указанную папку.
 
@@ -59,9 +61,9 @@ async def save_csv_file(event, upload_dir: str = CONFIG.csv_settings["READ_DATA"
         return "Ошибка: Пожалуйста, загрузите CSV-файл."
 
 
-def get_csv_prompt(columns: dict = CONFIG.db_settings["columns"],
-                   sep: str = CONFIG.csv_settings["READ_DATA"]["from_csv"]["sep"],
-                   enc: str = CONFIG.csv_settings["READ_DATA"]["from_csv"]["encoding"]):
+def get_csv_prompt(columns: dict = CONFIG.DATABASE.columns,
+                   sep: str = CONFIG.CSV.READ_DATA.from_csv["sep"],
+                   enc: str = CONFIG.CSV.READ_DATA.from_csv["encoding"]):
     text = [["ОАО Зета", "Соколова", "Анна", "Кадры", "1-я категория", "1995-04-18", 7],
             ["ПАО Эта", "Козлов", "Иван", "Генеральный директор", "VIP", "1978-09-23", 30]]
     names = [col_name for col_name, col_type in columns.items() if 'PRIMARY' not in col_type]
@@ -192,7 +194,7 @@ async def show_start_menu(event, user_id, rewrite=True):
     """
     # перед выводом главного меню сбрасываем состояние пользователя до изначального
     await drop_user_state(user_id)
-    menu = make_menu("start_menu", TELETHON_API)
+    menu = make_menu("start_menu", CONFIG.TELETHON_API)
     await handle_edit_respond(event, "Выберите опцию:", buttons=menu, rewrite=rewrite)
 
 
@@ -200,7 +202,7 @@ async def show_add_record_menu(event, user_id, rewrite=True):
     """
     Показывает меню 2 уровня для ввода данных.
     """
-    menu = make_menu("add_record_menu", TELETHON_API)
+    menu = make_menu("add_record_menu", CONFIG.TELETHON_API)
     await handle_edit_respond(event, "Выберите поле для ввода данных:", buttons=menu, rewrite=rewrite)
 
 
@@ -214,7 +216,7 @@ async def validate_record(event, user_id):
     else:
         await event.edit(f"Вы не заполнили обязательное поле.")
         msg = await client.send_message(event.chat_id, f'Вы не заполнили обязательное поле.', buttons=None)
-        prompt = f"Введите {get_prompt_from_config('birth_date', TELETHON_API)}"
+        prompt = f"Введите {get_prompt_from_config('birth_date', CONFIG.TELETHON_API)}"
         await ask_for_input(msg, user_id, 'birth_date', prompt)
 
 
@@ -307,7 +309,7 @@ async def handle_callback(event):
         # add_record_menu
         case "company" | "position" | "gift_category" | "first_name" | "last_name" | \
              "birth_date" | "notice_before_days" as choice:
-            prompt = f"Введите {get_prompt_from_config(choice, TELETHON_API)}"
+            prompt = f"Введите {get_prompt_from_config(choice, CONFIG.TELETHON_API)}"
             await ask_for_input(event, user_id, choice, prompt)
 
         case "confirm_record":
@@ -395,7 +397,7 @@ async def main():
     The main entry point for running the Telegram bot.
     """
 
-    await client.start(bot_token=CONFIG.telethon_api_settings.get('bot_token'))
+    await client.start(bot_token=CONFIG.TELETHON_API.bot_token)
     logger.info("Telegram bot is running.")
 
     # Запуск планировщика

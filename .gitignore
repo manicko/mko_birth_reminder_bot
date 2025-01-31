@@ -179,7 +179,10 @@ cython_debug/
 
 /logs/*
 /tmp/*
-*secrets.yaml
+**/user/*
+
+
+**user*.yaml
 !default_secrets.yaml
 *.csv
 *token.json

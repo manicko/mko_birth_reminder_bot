@@ -1,4 +1,4 @@
-from .config_reader import CONFIG
+from .config import CONFIG
 import mko_birth_reminder_bot.core.utils
 from .db_worker import DBWorker, TGUserData, TGUsers,TGUser
 from .csv_woker import CSVWorker

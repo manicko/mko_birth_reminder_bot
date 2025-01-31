@@ -3,7 +3,6 @@ import asyncio
 import yaml
 import logging
 from random import randint
-from pathlib import Path
 from prettytable import PrettyTable
 from telethon import TelegramClient
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -13,11 +12,12 @@ from mko_birth_reminder_bot.core import CONFIG, TGUsers, TGUserData
 
 logger = logging.getLogger(__name__)
 
-STATE_FILE = CONFIG.reminder_settings["state_file"]
+STATE_FILE = CONFIG.REMINDER.state_file
 
-TIMEZONE = CONFIG.reminder_settings["timezone"]
-TRIGGER_ARGS = CONFIG.reminder_settings["trigger"]
-COLUMNS = (
+TIMEZONE = CONFIG.REMINDER.timezone
+
+TRIGGER_ARGS = CONFIG.REMINDER.trigger
+COLUMNS_TO_SEND = (
     'id',
     # 'company',
     'last_name',
@@ -43,7 +43,7 @@ def load_state():
     return None
 
 
-def beautify_table(data: dict, columns: tuple = COLUMNS) -> str | None:
+def beautify_table(data: dict, columns: tuple = COLUMNS_TO_SEND) -> str | None:
     if data:
         table = PrettyTable()
         table.field_names = data["header"]

@@ -1,5 +1,5 @@
 import logging.config
-from .config_reader import CONFIG
+from .config import CONFIG
 
-logging.config.dictConfig(CONFIG.log_settings)
+logging.config.dictConfig(CONFIG.LOGGING)
 

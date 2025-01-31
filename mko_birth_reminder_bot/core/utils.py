@@ -124,17 +124,6 @@ def get_text(text_to_validate: str) -> str:
     return clean_value
 
 
-def yaml_to_dict(file: str | PathLike):
-    with open(file, "r", encoding="utf8") as stream:
-        try:
-            data = yaml_safe_load(stream)
-        except YAMLError as exc:
-            raise exc
-        else:
-            return data
-
-
-
 def resolve_path(path: str | Path, base_dir: Path | None = None) -> Path:
     """
     Универсальная функция для поиска пути.

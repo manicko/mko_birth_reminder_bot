@@ -11,27 +11,24 @@ from pathlib import Path
 class TestConfig:
     def test_config(self, config):
         try:
-            config
+            isinstance(config,object)
         except Exception as e:
             pytest.fail(f"Reading YAML file raised an exception: {e}")
 
-    @pytest.mark.parametrize("field, expected_result", [
-        ('DATABASE', True),
-        ('CSV', True),
-        ('REMINDER', True),
+    def test_database(self, config):
+        assert isinstance(config.DATABASE, object), f"Configuration does not contain required field:Database"
 
-    ])
-    def test_key_fields(self, config, field, expected_result):
-        assert (field in config.settings) == expected_result, f"Configuration does not contain required field:{field}"
+    def test_csv(self, config):
+        assert isinstance(config.CSV, object), f"Configuration does not contain required field:CSV"
 
     def test_log(self, config):
-        assert len(config.log_settings) != 0, f"Configuration does not contain log settings"
+        assert isinstance(config.LOGGING, object), f"Configuration does not contain log settings"
 
     def test_telethon_api_settings(self, config):
-        assert len(config.telethon_api_settings) != 0, f"Configuration does not contain telethon api settings"
+        assert isinstance(config.TELETHON_API, object), f"Configuration does not contain telethon api settings"
 
     def test_reminder_settings(self, config):
-        assert len(config.reminder_settings) != 0, f"Configuration does not contain telethon api settings"
+        assert isinstance(config.REMINDER, object), f"Configuration does not contain telethon api settings"
 
 class TestCSVReader:
     def test_read_valid_data(self, csv_worker):

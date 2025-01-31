@@ -97,8 +97,8 @@ def get_csv(test_data: List[Dict[str, str]]) -> Path:
 
     try:
         df = pd.DataFrame(test_data)
-        target_output = Path(CONFIG['CSV']["EXPORT_DATA"]["path"], 'test_data.csv')
-        df.to_csv(target_output, **CONFIG['CSV']["EXPORT_DATA"]["to_csv"])
+        target_output = Path(CONFIG.CSV.EXPORT_DATA.path, 'test_data.csv')
+        df.to_csv(target_output, **CONFIG.CSV.EXPORT_DATA.to_csv)
         print(f"Test data successfully saved to {target_output}")
         return target_output
 
@@ -110,6 +110,6 @@ def get_csv(test_data: List[Dict[str, str]]) -> Path:
 @pytest.fixture(autouse=True)
 def cleanup_temp_files(config):
     yield
-    target_output = Path(config['CSV']["EXPORT_DATA"]["path"], 'test_data.csv')
+    target_output = Path(config.CSV.EXPORT_DATA.path, 'test_data.csv')
     if target_output.is_file():
         target_output.unlink()

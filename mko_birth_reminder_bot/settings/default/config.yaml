@@ -20,6 +20,7 @@
   'CSV':
     { 'READ_DATA': { # general settings for pandas CSV reader
       "path": "tmp",
+      'delete_after': 3, # for how long to keep imported files if 0 forever
       'from_csv': {
         'sep': ';',
         'on_bad_lines': 'skip',

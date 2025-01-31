@@ -3,13 +3,16 @@ from typing import List, Tuple, Optional, Any, Dict, Literal, Union
 from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
-from .config_reader import CONFIG
+from .config import CONFIG
 from .utils import data_validation, dict_from_row
 import logging
 from .errors import *
 
 
 class DBWorker:
+    """
+    Class for working with SQLite database.
+    """
     DATA_TO_SQL_PARAMS = {
         'if_exists': 'append',
         'index': False,
@@ -17,22 +20,28 @@ class DBWorker:
     }
 
     def __init__(self):
-        self.db_settings = CONFIG.db_settings
+        """
+        Initializes a DBWorker instance.
+        """
+        self.db_settings = CONFIG.DATABASE
         self.logger = logging.getLogger(__name__)
         self.db_con = self._db_connect()
-
-        # настраиваем тип возвращаемых данных row_factory
         self.db_con.row_factory = sqlite3.Row
 
     def _db_connect(self):
-        """Подключается к базе данных SQLite."""
+        """
+        Establishes a connection to the SQLite database.
+
+        Returns:
+            sqlite3.Connection: Database connection.
+        """
         try:
-            self.db_file = Path(self.db_settings['path'], self.db_settings['db_file'])
+            self.db_file = Path(self.db_settings.path, self.db_settings.db_file)
             db_con = sqlite3.connect(self.db_file)
-            self.logger.info("Инициализация базы данных.")
+            self.logger.info("Database initialized.")
             return db_con
         except sqlite3.Error as e:
-            self.logger.error(f"Не удалось подключиться к базе данных: {e}")
+            self.logger.error(f"Database connection error: {e}")
             raise e
 
     def perform_query(
@@ -42,13 +51,17 @@ class DBWorker:
             fetch: Literal['all', 'one', None] = None,
             raise_exceptions: bool = False
     ) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
-        """Выполняет SQL-запрос.
+        """
+        Executes an SQL query.
 
-        :param query: SQL-запрос.
-        :param term: Параметры для запроса.
-        :param fetch: Literal['all', 'one', None] - какой тип результата возвращать.
-        :param raise_exceptions: Поднимать ли исключения при ошибках.
-        :return: Результаты запроса в виде строки или списка строк.
+        Args:
+            query (str): SQL query.
+            term (Optional[Tuple | List]): Query parameters.
+            fetch (Literal['all', 'one', None]): Type of result to return.
+            raise_exceptions (bool): Whether to raise exceptions on errors.
+
+        Returns:
+            Optional[Union[List[sqlite3.Row], sqlite3.Row]]: Query results.
         """
         cursor = self.db_con.cursor()
         try:
@@ -61,84 +74,129 @@ class DBWorker:
                 case _:
                     result = None
             self.db_con.commit()
-            self.logger.debug(f"Запрос выполнен: {query}, параметры: {term}, результат: {result}")
+            self.logger.debug(f"Query executed: {query}, parameters: {term}, result: {result}")
             return result
         except sqlite3.Error as err:
-            self.logger.error(f"Ошибка при выполнении запроса: '{query}' с параметрами {term}. Ошибка: {err}")
+            self.logger.error(f"Query execution error: '{query}' with parameters {term}. Error: {err}")
             if raise_exceptions:
                 raise
         finally:
             cursor.close()
 
     def create_table(self, tbl_name: str, columns: Dict[str, str]):
-        """Создаёт таблицу с указанными колонками.
+        """
+        Creates a table with the specified columns.
 
-        :param tbl_name: Название таблицы.
-        :param columns: Словарь, где ключи — названия колонок, значения — их типы.
+        Args:
+            tbl_name (str): Table name.
+            columns (Dict[str, str]): Dictionary where keys are column names and values are their data types.
         """
         column_definitions = ", ".join(f"{col} {dtype}" for col, dtype in columns.items())
         query = f"CREATE TABLE IF NOT EXISTS {tbl_name} ({column_definitions});"
         self.perform_query(query)
 
     def drop_table(self, table_name: str) -> bool:
-        """Удаляет таблицу из базы данных.
+        """
+        Drops a table from the database.
 
-        :param table_name: Название таблицы.
-        :return: True, если удаление прошло успешно, иначе False.
+        Args:
+            table_name (str): Table name.
+
+        Returns:
+            bool: True if the table was successfully deleted, otherwise False.
         """
         query = f"DROP TABLE IF EXISTS {table_name}"
         if self.perform_query(query):
-            self.logger.debug(f"Таблица '{table_name}' успешно удалена.")
+            self.logger.debug(f"Table '{table_name}' successfully dropped.")
             return True
         return False
 
     def close(self):
-        """Закрывает соединение с базой данных."""
+        """
+        Closes the database connection.
+        """
         if self.db_con:
             try:
                 self.db_con.close()
             except sqlite3.Error as e:
-                self.logger.error(f"Ошибка при закрытии соединения: {e}")
+                self.logger.error(f"Error closing the connection: {e}")
             else:
-                self.logger.info("Соединение успешно закрыто.")
+                self.logger.info("Connection successfully closed.")
 
     def __enter__(self):
-        """Поддержка контекстного менеджера."""
+        """
+        Supports the context manager protocol.
+        """
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Закрытие соединения при выходе из контекста."""
+        """
+        Closes the connection when exiting the context.
+        """
         self.close()
 
 
 class TGUserData(DBWorker):
-    """Класс для работы с данными пользователей."""
+    """
+    Class for handling user data.
 
-    def __init__(self, tg_user_id: int | None):
+    Attributes:
+        columns (dict): Database column definitions.
+        column_names (list): List of column names.
+        date_column (str): Name of the date column.
+        date_format (str): Date format string.
+        default_notice (Any): Default notice value.
+        _data_tbl_name (str): Internal table name.
+        notice_before_days_column (str): Column name for custom notices.
+    """
+
+    def __init__(self, tg_user_id: Optional[int]):
+        """
+        Initializes TGUserData.
+
+        Args:
+            tg_user_id (Optional[int]): Telegram user ID.
+        """
         super().__init__()
-        self.columns = self.db_settings['columns']
+        self.columns = self.db_settings.columns
         self.column_names = list(self.columns.keys())
-        self.date_column = self.db_settings['date_column']
-        self.date_format = self.db_settings["date_format"]  # %d/%m/%y
-        self.default_notice = self.db_settings['default_notice']
+        self.date_column = self.db_settings.date_column
+        self.date_format = self.db_settings.date_format  # %d/%m/%y
+        self.default_notice = self.db_settings.default_notice
         self._data_tbl_name = None
-        self.notice_before_days_column = self.db_settings['custom_notice_column']
+        self.notice_before_days_column = self.db_settings.custom_notice_column
         if tg_user_id:
             self.data_tbl_name = tg_user_id
 
     @property
-    def data_tbl_name(self):
+    def data_tbl_name(self) -> str:
+        """Gets the data table name."""
         return self._data_tbl_name
 
     @data_tbl_name.setter
-    def data_tbl_name(self, tg_user_id):
+    def data_tbl_name(self, tg_user_id: int) -> None:
+        """
+        Sets the data table name.
+
+        Args:
+            tg_user_id (int): Telegram user ID.
+        """
         try:
             self._data_tbl_name = 'id_' + str(tg_user_id)
         except TypeError as e:
             self.logger.error(f"Parameter tg_user_id should be integer. {e}")
 
     def add_data(self, prepared_data: pd.DataFrame, sql_loader_settings: Optional[Dict[str, Any]] = None) -> int:
-        """Добавляет данные в таблицу."""
+        """
+        Adds data to the table.
+
+        Args:
+            prepared_data (pd.DataFrame): Data to be added.
+            sql_loader_settings (Optional[Dict[str, Any]]): SQL loading settings.
+
+        Returns:
+            int: Number of records added.
+        """
         if sql_loader_settings is None:
             sql_loader_settings = DBWorker.DATA_TO_SQL_PARAMS
         prepared_data.to_sql(
@@ -146,11 +204,11 @@ class TGUserData(DBWorker):
             name=self._data_tbl_name,
             con=self.db_con
         )
-        self.logger.info(f"Добавлено {prepared_data.shape[0]} записей.")
+        self.logger.info(f"Added {prepared_data.shape[0]} records.")
         return prepared_data.shape[0]
 
-    def flush_data(self):
-        """"""
+    def flush_data(self) -> None:
+        """Flushes data by dropping and recreating the table."""
         self.drop_table(self._data_tbl_name)
         self.create_table(self._data_tbl_name, self.columns)
 
@@ -209,56 +267,43 @@ class TGUserData(DBWorker):
 
     def get_all_records(self) -> pd.DataFrame:
         """
-        Получает запись из таблицы данных текущего пользователя по id.
+        Retrieves all records from the user data table.
 
+        Returns:
+            pd.DataFrame: Data from the table.
         """
         try:
             query = f"""SELECT * FROM {self._data_tbl_name}"""
-            # df = self.perform_query(query, fetch='all', raise_exceptions=True)
-
             return pd.read_sql(query, self.db_con)
-
         except Exception as e:
-            self.logger.warning(F"Не удалось получить данные из '{self._data_tbl_name}', "
-                                F"из-за ошибки: '{e}' ")
+            self.logger.warning(f"Failed to retrieve data from '{self._data_tbl_name}', due to error: '{e}' ")
             return pd.DataFrame()
 
     def get_record_by_id(self, record_id: int) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
         """
-        Получает запись из таблицы данных текущего пользователя по id.
+        Retrieves a record from the user data table by ID.
 
-        :param record_id: id строки, которую необходимо получить.
+        Args:
+            record_id (int): Record ID.
+
+        Returns:
+            Optional[Union[List[sqlite3.Row], sqlite3.Row]]: Retrieved record(s) or None if invalid.
         """
         try:
             row_id = int(record_id)
             query = f"""SELECT * FROM {self._data_tbl_name} WHERE id = ?"""
             return self.perform_query(query, (row_id,), fetch='one')
         except ValueError:
-            self.logger.warning(F"Недопустимый id записи: '{record_id}', id должен быть integer")
+            self.logger.warning(f"Invalid record ID: '{record_id}', ID must be an integer.")
             return None
 
     def update_record_by_id(self, record_id: int, **fields) -> None:
         """
-        Updates a record in the user's data table by its ID.
+        Validates the input and updates a record in the user data table by its ID.
 
-        Parameters:
-        ----------
-        record_id : int
-            The ID of the record to be updated.
-        fields : dict
-            Key-value pairs representing field names and their new values
-            in the format "field_name=field_value".
-
-        Returns:
-        -------
-        None
-
-        Behavior:
-        --------
-        - Validates the provided fields using the `data_validation` function.
-        - Constructs a SQL query dynamically based on the provided fields.
-        - Executes the SQL query to update the specified record.
-        - Logs errors in case of any validation or query execution issues.
+        Args:
+            record_id (int): Record ID.
+            **fields: Fields to update.
         """
         try:
             # Validate the input fields
@@ -278,70 +323,55 @@ class TGUserData(DBWorker):
         """
         Deletes a record from the database table by its ID.
 
-        Parameters:
-        ----------
-        record_id : int
-            The ID of the record to be deleted.
-
-        Returns:
-        -------
-        None
-
-        Behavior:
-        --------
-        - Attempts to convert the provided `record_id` to an integer.
-        - Constructs and executes an SQL DELETE query to remove the record with the specified ID.
-        - Logs an error if the `record_id` is not a valid integer.
+        Args:
+            record_id (int): Record ID.
 
         Raises:
-        ------
-        None, but logs errors internally.
+            WrongInput: If record_id is not an integer.
         """
         try:
             # Ensure the record ID is a valid integer
             record_id = int(record_id)
         except ValueError as e:
-            # Log the error if conversion fails
             self.logger.error(f"Invalid record ID: must be an integer. Error: {e}, Provided: {record_id}")
             raise WrongInput(f"Invalid record ID: must be an integer. Provided: {record_id}")
         else:
             try:
-                # Construct the SQL DELETE query
                 query = f"DELETE FROM {self._data_tbl_name} WHERE id = ?"
-                # Execute the query
                 self.perform_query(query, (record_id,), raise_exceptions=True)
-                # Optional: Log successful deletion
                 self.logger.info(f"Record with ID {record_id} successfully deleted.")
             except Exception as e:
-                # Log any unexpected errors during query execution
                 self.logger.error(f"Error deleting record with ID {record_id}: {e}")
                 raise f"Error deleting record with ID {record_id}"
 
-    def _get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[
-        Union[List[sqlite3.Row], sqlite3.Row]]:
-        """Возвращает данные в диапазоне дат.
-
-        :param start_date: Начальная дата (DD/MM/YYYY).
-        :param end_date: Конечная дата (DD/MM/YYYY).
-        :return: Список данных.
+    def _get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
         """
-        # Преобразуем входные даты в объекты datetime
+        Returns data within a date range.
+
+        Args:
+            start_date (str): Start date.
+            end_date (str): End date.
+
+        Returns:
+            Optional[Union[List[sqlite3.Row], sqlite3.Row]]: Retrieved records.
+        """
+        # Convert input dates to datetime objects
         start_date = datetime.strptime(start_date, self.date_format)
         end_date = datetime.strptime(end_date, self.date_format)
-        # Извлекаем месяц и день
+        # Extract month and day
         start_month_day = (start_date.month, start_date.day)
         end_month_day = (end_date.month, end_date.day)
-        # SQL-запрос для выборки по диапазону
+        # SQL query for range selection
         query = f"SELECT {', '.join(self.column_names)} FROM {self._data_tbl_name} WHERE "
         if start_month_day <= end_month_day:
-            # Диапазон в пределах одного года
+            # Range within a single year
             query += f"strftime('%m-%d', {self.date_column}) BETWEEN ? AND ?"
             params = (
                 f"{start_month_day[0]:02d}-{start_month_day[1]:02d}",
                 f"{end_month_day[0]:02d}-{end_month_day[1]:02d}",
             )
         else:
-            # Диапазон пересекает границу года
+            # Range crossing the year boundary
             query += (
                 f"(strftime('%m-%d', {self.date_column}) BETWEEN ? AND '12-31' OR "
                 f"strftime('%m-%d', {self.date_column}) BETWEEN '01-01' AND ?)"
@@ -360,8 +390,7 @@ class TGUserData(DBWorker):
         # (query, (start_date, end_date, end_date, start_date, end_date))
         return self.perform_query(query, params, fetch='all')
 
-    def _get_upcoming_dates(self, notice_period_days: int = 0, date: datetime | None = None) -> Optional[
-        Union[List[sqlite3.Row], sqlite3.Row]]:
+    def _get_upcoming_dates(self, notice_period_days: int = 0, date: datetime | None = None) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
         """
         Fetch users whose birthdays match their 'notice_period_days' days from the current date.
         :return: List of users with matching birthdays.
@@ -453,7 +482,7 @@ class TGUser(DBWorker):
 
     def __init__(self, tg_user_id: int):
         super().__init__()
-        self.date_format = self.db_settings['date_format']
+        self.date_format = self.db_settings.date_format
         self._tg_user_id = int(tg_user_id)
         self._info = self.get_info()
         self.is_exist = False
@@ -544,7 +573,7 @@ class TGUser(DBWorker):
         """
         Добавляет в базу таблицу для загрузки данных пользователя.
        """
-        self.create_table(f'id_{str(self._tg_user_id)}', self.db_settings["columns"])
+        self.create_table(f'id_{str(self._tg_user_id)}', self.db_settings.columns)
 
     def del_info(self):
         """
