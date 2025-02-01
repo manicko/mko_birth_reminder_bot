@@ -1,60 +1,30 @@
 from pathlib import Path
-from symtable import Class
-from typing import Any, Dict, Optional
-import yaml
+from typing import Any
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from mko_birth_reminder_bot.core.utils import resolve_nested_paths, resolve_path
+from platformdirs import user_config_dir
+from mko_birth_reminder_bot.core.config_worker import (load_config,
+                                                       resolve_nested_paths,
+                                                       resolve_path, merge_dicts)
 
-# Пути к файлам конфигурации
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_SETTINGS_FOLDER = Path.joinpath(ROOT_DIR, "settings/default")
 
-USER_SETTINGS_FOLDER = 'settings/user'
-DEFAULT_SETTINGS_FOLDER = 'settings/default'
-
-CONFIG_FILE = 'config.yaml'
-LOG_CONFIG_FILE = 'log_config.yaml'
-SECRETS_FILE = 'secrets.yaml'
-
-DEFAULT_CONFIG_PATH = Path.joinpath(ROOT_DIR, DEFAULT_SETTINGS_FOLDER, CONFIG_FILE)
-DEFAULT_LOG_CONFIG_PATH = Path.joinpath(ROOT_DIR, DEFAULT_SETTINGS_FOLDER, LOG_CONFIG_FILE)
-DEFAULT_SECRETS_PATH = Path.joinpath(ROOT_DIR, DEFAULT_SETTINGS_FOLDER, SECRETS_FILE)
-
-USER_CONFIG_PATH = Path.joinpath(ROOT_DIR, USER_SETTINGS_FOLDER, 'user_config.yaml')
-USER_LOG_CONFIG_PATH = Path.joinpath(ROOT_DIR, USER_SETTINGS_FOLDER, 'user_log_config.yaml')
-USER_SECRETS_PATH = Path.joinpath(ROOT_DIR, USER_SETTINGS_FOLDER, 'user_secrets.yaml')
+MODULE_NAME = str(Path(__file__).resolve().parent.parent.name)
+USER_SETTINGS_FOLDER = Path.joinpath(Path(user_config_dir(MODULE_NAME)), "settings")
 
 
-
-class YamlConfigSettingsSource:
-    """
-    Load YAML files.
-    """
-
-    @classmethod
-    def load_config(cls, path: Path) -> Dict[str, Any]:
-        if path.exists():
-            with path.open("r", encoding="utf-8") as f:
-                return yaml.safe_load(f) or {}
-        return {}
-
-    @staticmethod
-    def merge_dicts(dict1, dict2):
-        """ Recursively merges dict2 into dict1 """
-        if not isinstance(dict1, dict) or not isinstance(dict2, dict):
-            return dict2
-        for k in dict2:
-            if k in dict1:
-                dict1[k] = YamlConfigSettingsSource.merge_dicts(dict1[k], dict2[k])
-            else:
-                dict1[k] = dict2[k]
-        return dict1
+CONFIG_FILES = {
+    "config": 'config.yaml',
+    "log_config": 'log_config.yaml',
+    "secrets": 'secrets.yaml',
+}
 
 class DatabaseSettings(BaseModel):
     path: Path | str = Field(default=Path("data"))
     db_file: Path | str = Field(default=Path("birthdays.db"))
-    columns: Dict[str, str] = {
+    columns: dict[str, str] = {
         'id': 'INTEGER PRIMARY KEY AUTOINCREMENT',
         'company': 'TEXT',
         'last_name': 'TEXT',
@@ -75,11 +45,12 @@ class DatabaseSettings(BaseModel):
     def validate_paths(cls, v):
         return resolve_path(v)
 
+
 class CsvSettings(BaseModel):
     class ReadDataSettings(BaseModel):
-        path: Path | str  = Field(default=Path("tmp"))
+        path: Path | str = Field(default=Path("tmp"))
         delete_after: int = 3
-        from_csv: Dict[str, Any]
+        from_csv: dict[str, Any]
 
         # noinspection PyNestedDecorators
         @field_validator("path", mode="before")
@@ -88,8 +59,8 @@ class CsvSettings(BaseModel):
             return resolve_path(v)
 
     class ExportDataSettings(BaseModel):
-        path: Path | str  = Field(default=Path("tmp"))
-        to_csv: Dict[str, Any]
+        path: Path | str = Field(default=Path("tmp"))
+        to_csv: dict[str, Any]
 
         # noinspection PyNestedDecorators
         @field_validator("path", mode="before")
@@ -101,27 +72,26 @@ class CsvSettings(BaseModel):
     EXPORT_DATA: ExportDataSettings
 
 
-
 class TelethonApiSettings(BaseModel):
-    start_menu: list[list[dict[str, str]]]
-    add_record_menu: list[list[dict[str, str]]]
+    menu: dict[str, list[list[dict[str, str]]]]
     bot_token: str
-    client: Dict[str, Any]
+    client: dict[str, Any]
 
 
 class ReminderSettings(BaseModel):
     timezone: str = "Europe/Moscow"
-    trigger: Dict[str, int]
-    state_file: Path | str  = Field(default=Path("reminder_state.yaml"))
+    trigger: dict[str, int]
+    state_file: Path | str = Field(default=Path("reminder_state.yaml"))
+    columns_to_send: list[str]
 
 
 class LoggingSettings(BaseModel):
     version: int = 1
     disable_existing_loggers: bool = False
-    formatters: Dict[str, Any]
-    handlers: Dict[str, Any]
-    loggers: Dict[str, Any]
-    root: Dict[str, Any]
+    formatters: dict[str, Any]
+    handlers: dict[str, Any]
+    loggers: dict[str, Any]
+    root: dict[str, Any]
 
 
 class Config(BaseSettings):
@@ -135,27 +105,15 @@ class Config(BaseSettings):
 
     @classmethod
     def load(cls) -> "Config":
-        default_config = YamlConfigSettingsSource.load_config(DEFAULT_CONFIG_PATH)
-        user_config = YamlConfigSettingsSource.load_config(USER_CONFIG_PATH)
-        YamlConfigSettingsSource.merge_dicts(default_config, user_config)  # Объединение конфигураций
 
-        # LOGGING
-        default_log_config = YamlConfigSettingsSource.load_config(DEFAULT_LOG_CONFIG_PATH)
-        user_log_config = YamlConfigSettingsSource.load_config(USER_LOG_CONFIG_PATH)
-        YamlConfigSettingsSource.merge_dicts(default_log_config, user_log_config)
+        merged_config = {}
+        for folder in (DEFAULT_SETTINGS_FOLDER, USER_SETTINGS_FOLDER):
+            for file in CONFIG_FILES.values():
+                path = Path.joinpath(folder, file)
+                data = load_config(path)
+                merge_dicts(merged_config, data)
 
-        default_config["LOGGING"] = default_log_config
-
-        # TELETHON SECRETS
-        default_secrets = YamlConfigSettingsSource.load_config(DEFAULT_SECRETS_PATH)
-        user_secrets = YamlConfigSettingsSource.load_config(USER_SECRETS_PATH)
-
-        YamlConfigSettingsSource.merge_dicts(default_secrets, user_secrets)
-        YamlConfigSettingsSource.merge_dicts(default_config, default_secrets)
-
-        # CHECKING PATHS
-        merged_config = resolve_nested_paths(default_config)
-
+        merged_config = resolve_nested_paths(merged_config)
         return cls.model_validate(merged_config)
 
 

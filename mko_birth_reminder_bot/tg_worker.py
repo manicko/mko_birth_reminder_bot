@@ -14,25 +14,6 @@ client = TelegramClient(**CONFIG.TELETHON_API.client)
 
 # Словарь для временного хранения данных пользователей
 user_data = {}
-#
-# TELETHON_API = {
-#     "start_menu": [
-#         [{"add_record": "Добавить запись"}],
-#         [{"update_record_by_id": "Исправить по id"},
-#          {"delete_record_by_id": "Удалить по id"}],
-#         [{"import_csv": "Импорт из CSV"}, {"export_csv": "Экспорт в CSV"}],
-#         [{"delete_user": "Отписаться"}],
-#     ],
-#     "add_record_menu": [
-#         [{"back_to_start": "Назад"}],
-#         [{"first_name": "Имя"}, {"last_name": "Фамилия"}],
-#         [{"company": "Компания"}, {"position": "Должность"}],
-#         [{"gift_category": "Категория подарка"}],
-#         [{"birth_date": "День рождения в формате ДД.ММ.ГГГГ"}],
-#         [{"notice_before_days": "За сколько дней предупредить"}],
-#         [{"confirm_record": "Подтвердить"}]
-#     ]
-# }
 
 DEFAULT_CAPTION = "Повторите попытку введя команду /start"
 
@@ -194,15 +175,15 @@ async def show_start_menu(event, user_id, rewrite=True):
     """
     # перед выводом главного меню сбрасываем состояние пользователя до изначального
     await drop_user_state(user_id)
-    menu = make_menu("start_menu", CONFIG.TELETHON_API)
+    menu = make_menu("start", CONFIG.TELETHON_API.menu)
     await handle_edit_respond(event, "Выберите опцию:", buttons=menu, rewrite=rewrite)
 
 
-async def show_add_record_menu(event, user_id, rewrite=True):
+async def show_add_record_menu(event, rewrite=True):
     """
     Показывает меню 2 уровня для ввода данных.
     """
-    menu = make_menu("add_record_menu", CONFIG.TELETHON_API)
+    menu = make_menu("add_record", CONFIG.TELETHON_API.menu)
     await handle_edit_respond(event, "Выберите поле для ввода данных:", buttons=menu, rewrite=rewrite)
 
 

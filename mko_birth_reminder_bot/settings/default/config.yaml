@@ -12,7 +12,7 @@
       'birth_date': 'TEXT NOT NULL',
       'notice_before_days': 'INTEGER',
     },
-    "default_notice":[0,1,2,3,5,7,14],
+    "default_notice": [ 0,1,2,3,5,7,14 ],
     "custom_notice_column": 'notice_before_days',
     "date_column": 'birth_date',
     "date_format": '%Y-%m-%d' # only works if you respect the ISO8601 notation: YYYY-MM-DD
@@ -44,20 +44,24 @@
 
     },
   "TELETHON_API": {
-    "start_menu": [
-      [ { "add_record": "Добавить запись" } ],
-      [ { "update_record_by_id": "Скорректировать запись по id" },
-        { "delete_record_by_id": "Скорректировать запись по id" } ],
-      [ { "import_csv": "Импорт из csv" }, { "export_csv": "Экспорт в csv" } ],
-      [ { "delete_user": "Отписаться" } ],
-    ],
-    "add_record_menu": [
-      [ { "back_to_start": "Назад" } ],
-      [ { "company": "Компания" }, { "position": "Должность" }, { "gift_category": "Категория подарка" } ],
-      [ { "first_name": "Имя" }, { "last_name": "Фамилия" } ],
-      [ { "birth_date": "День рождения" }, { "notice_before_days": "За сколько дней предупредить" } ],
-      [ { "confirm_data": "Подтвердить" } ],
-    ]
+    "menu": {
+      "start": [
+        [ { "add_record": "Добавить запись" } ],
+        [ { "update_record_by_id": "Скорректировать запись по id" },
+          { "delete_record_by_id": "Скорректировать запись по id" } ],
+        [ { "import_csv": "Импорт из csv" }, { "export_csv": "Экспорт в csv" } ],
+        [ { "delete_user": "Отписаться" } ],
+      ],
+      "add_record": [
+        [ { "back_to_start": "Назад" } ],
+        [ { "company": "Компания" }, { "position": "Должность" } ],
+        [ { "gift_category": "Категория подарка" } ],
+        [ { "first_name": "Имя" }, { "last_name": "Фамилия" } ],
+        [ { "birth_date": "День рождения" }, { "notice_before_days": "За сколько дней предупредить" } ],
+        [ { "confirm_data": "Подтвердить" } ],
+      ]
+    },
+
   },
   "REMINDER": {
     "timezone": "Europe/Moscow",
@@ -66,6 +70,15 @@
       "minute": 50
     },
     "state_file": "reminder_state.yaml",
+    "columns_to_send": [
+      'id',
+      # 'company',
+      'last_name',
+      'first_name',
+      # 'gift_category',
+      'birth_date'
+    ]
+
   }
 }
 
