@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 client = TelegramClient(**CONFIG.TELETHON_API.client)
 
 
-
 # Словарь для временного хранения данных пользователей
 user_data = {}
 

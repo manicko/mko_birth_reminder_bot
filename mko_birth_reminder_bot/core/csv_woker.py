@@ -42,7 +42,6 @@ class CSVWorker:
         :param csv_file: Name of the CSV file to read.
         :return: DataFrame with the CSV data or raises an exception on failure.
         """
-        print("++++++++++++++++++++++++++++++", csv_file)
         file_path = Path(csv_file).resolve()
 
         if not file_path.is_file():

@@ -8,10 +8,11 @@ from .test_data import TestData
 import mko_birth_reminder_bot.core.errors as errors
 from pathlib import Path
 
+
 class TestConfig:
     def test_config(self, config):
         try:
-            isinstance(config,object)
+            isinstance(config, object)
         except Exception as e:
             pytest.fail(f"Reading YAML file raised an exception: {e}")
 
@@ -30,6 +31,7 @@ class TestConfig:
     def test_reminder_settings(self, config):
         assert isinstance(config.REMINDER, object), f"Configuration does not contain telethon api settings"
 
+
 class TestCSVReader:
     def test_read_valid_data(self, csv_worker):
         try:
@@ -46,8 +48,6 @@ class TestCSVReader:
         with pytest.raises(errors.ColumnMismatch):
             df = csv_worker.read_csv(valid_test_csv)
 
-
-
     def test_read_invalid_valid_data(self, csv_worker):
         try:
             valid_test_csv = get_csv(get_test_data(0, False))
@@ -56,7 +56,6 @@ class TestCSVReader:
             assert len(df) == 4, f"No data read"
         except Exception as e:
             pytest.fail(f"Fail to del_info: {e}")
-
 
 
 class TestTGUser:
@@ -113,7 +112,7 @@ class TestTGUser:
         except Exception as e:
             pytest.fail(f"Fail to flush_data: {e}")
 
-    def test_add_record(self,random_user, user_data,csv_worker):
+    def test_add_record(self, random_user, user_data, csv_worker):
         try:
             # user_data._data_tbl_name = random_user.tg_user_id
             user_data.flush_data()
@@ -148,13 +147,13 @@ class TestTGUser:
             assert updated_record["birth_date"] == "1999-01-01"
 
             user_data.update_record_by_id(record_id=1,
-                                            company='TEST COMPANY',
-                                            last_name='TEST LAST NAME',
-                                            first_name='TEST FIRST NAME',
-                                            position='TEST POSITION',
-                                            gift_category='TEST GIFT CATEGORY',
-                                            notice_before_days=99,
-                                            birth_date='01/02/2023')
+                                          company='TEST COMPANY',
+                                          last_name='TEST LAST NAME',
+                                          first_name='TEST FIRST NAME',
+                                          position='TEST POSITION',
+                                          gift_category='TEST GIFT CATEGORY',
+                                          notice_before_days=99,
+                                          birth_date='01/02/2023')
             updated_record = user_data.get_record_by_id(1)
             assert updated_record["company"] == 'TEST COMPANY'
             assert updated_record["last_name"] == 'TEST LAST NAME'
@@ -216,11 +215,12 @@ class TestTGUser:
             df = user_data.get_all_records()
             file: Path = csv_worker.export_to_csv(df, 'test.csv')
             assert file.is_file() == True, f"Failed to create test output file:'test.csv'"
+            file.unlink(missing_ok=True)
         except Exception as e:
             pytest.fail(f"Fail to export_data: {e}")
 
     @freeze_time("2025-08-29 12:00:00")
-    def test_default_reminders(self,  user_data):
+    def test_default_reminders(self, user_data):
         test = []
         for i in [0, 1, 3, 7]:
             if x := user_data._get_upcoming_dates(i):

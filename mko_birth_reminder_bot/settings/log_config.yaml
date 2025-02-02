@@ -34,7 +34,7 @@
         "class": "logging.handlers.RotatingFileHandler",
         "level": "INFO",
         "formatter": "basic",
-        "filename": "logs/log.log",
+        "filename": "log.log",
         "maxBytes": 2000000,
         "backupCount": 2,
         "encoding": "utf-8"
