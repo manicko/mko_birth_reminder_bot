@@ -2,7 +2,7 @@ from freezegun import freeze_time
 import pytest
 import sqlite3
 from mko_birth_reminder_bot.core import TGUsers
-from tests.conftest import get_csv, get_test_data, csv_worker
+from tests.conftest import get_csv, get_test_data, csv_handler
 from mko_birth_reminder_bot.core.utils import (dict_from_row)
 from .test_data import TestData
 import mko_birth_reminder_bot.core.errors as errors
@@ -33,26 +33,26 @@ class TestConfig:
 
 
 class TestCSVReader:
-    def test_read_valid_data(self, csv_worker):
+    def test_read_valid_data(self, csv_handler):
         try:
             valid_test_csv = get_csv(get_test_data(10))
-            df = csv_worker.read_csv(valid_test_csv)
-            df = csv_worker.prepare_dataframe(df)
+            df = csv_handler.read_csv(valid_test_csv)
+            df = csv_handler.prepare_dataframe(df)
 
             assert len(df) > 0, f"No data read"
         except Exception as e:
             pytest.fail(f"Fail to del_info: {e}")
 
-    def test_read_wrong_columns_data(self, csv_worker):
+    def test_read_wrong_columns_data(self, csv_handler):
         valid_test_csv = get_csv(TestData.invalid_data_wrong_col_num)
         with pytest.raises(errors.ColumnMismatch):
-            df = csv_worker.read_csv(valid_test_csv)
+            csv_handler.read_csv(valid_test_csv)
 
-    def test_read_invalid_valid_data(self, csv_worker):
+    def test_read_invalid_valid_data(self, csv_handler):
         try:
             valid_test_csv = get_csv(get_test_data(0, False))
-            df = csv_worker.read_csv(valid_test_csv)
-            df = csv_worker.prepare_dataframe(df)
+            df = csv_handler.read_csv(valid_test_csv)
+            df = csv_handler.prepare_dataframe(df)
             assert len(df) == 4, f"No data read"
         except Exception as e:
             pytest.fail(f"Fail to del_info: {e}")
@@ -88,17 +88,17 @@ class TestTGUser:
         except Exception as e:
             pytest.fail(f"Fail to get_info: {e}")
 
-    def test_data_load(self, random_user, csv_worker, user_data):
+    def test_data_load(self, random_user, csv_handler, user_data):
         try:
             valid_test_csv = get_csv(get_test_data(20))
-            df = csv_worker.read_csv(valid_test_csv)
-            df = csv_worker.prepare_dataframe(df)
+            df = csv_handler.read_csv(valid_test_csv)
+            df = csv_handler.prepare_dataframe(df)
             # user_data.data_tbl_name = random_user.tg_user_id
             user_data.add_data(df)
         except Exception as e:
             pytest.fail(f"Fail to load data: {e}")
 
-    def test_records_count(self, random_user, csv_worker, user_data):
+    def test_records_count(self, random_user, csv_handler, user_data):
         try:
             count = user_data.count_records()
             print(f"{count} records loaded")
@@ -112,20 +112,20 @@ class TestTGUser:
         except Exception as e:
             pytest.fail(f"Fail to flush_data: {e}")
 
-    def test_add_record(self, random_user, user_data, csv_worker):
+    def test_add_record(self, random_user, user_data, csv_handler):
         try:
             # user_data._data_tbl_name = random_user.tg_user_id
             user_data.flush_data()
-            data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
+            data = dict(zip(csv_handler.data_column_names, get_test_data(1)[0]))
             user_data.add_record(**data)
         except Exception as e:
             pytest.fail(f"Fail to add_record: {e}")
 
-    def test_get_record(self, random_user, user_data, csv_worker):
+    def test_get_record(self, random_user, user_data, csv_handler):
         try:
             # user_data._data_tbl_name = random_user.tg_user_id
             user_data.flush_data()
-            data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
+            data = dict(zip(csv_handler.data_column_names, get_test_data(1)[0]))
             user_data.add_record(**data)
             assert user_data.get_record_by_id("SELECT") is None
             assert user_data.get_record_by_id(2) is None
@@ -135,12 +135,12 @@ class TestTGUser:
         except Exception as e:
             pytest.fail(f"Fail get_record: {e}")
 
-    def test_update_record(self, random_user, user_data, csv_worker):
+    def test_update_record(self, random_user, user_data, csv_handler):
         try:
             # user_data._data_tbl_name = random_user.tg_user_id
             user_data.flush_data()
 
-            data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
+            data = dict(zip(csv_handler.data_column_names, get_test_data(1)[0]))
             user_data.add_record(**data)
             user_data.update_record_by_id(record_id=1, birth_date="1999/01/01")
             updated_record = user_data.get_record_by_id(1)
@@ -166,13 +166,13 @@ class TestTGUser:
         except Exception as e:
             pytest.fail(f"Fail update_record: {e}")
 
-    def test_delete_record(self, random_user, user_data, csv_worker):
+    def test_delete_record(self, random_user, user_data, csv_handler):
         try:
             # user_data._data_tbl_name = "id_" + str(random_user.tg_user_id)
             user_data.flush_data()
 
             # adding record and testing it is there
-            data = dict(zip(csv_worker.data_column_names, get_test_data(1)[0]))
+            data = dict(zip(csv_handler.data_column_names, get_test_data(1)[0]))
             user_data.add_record(**data)
             assert len(user_data.get_record_by_id(1)) == len(user_data.column_names)
 
@@ -200,20 +200,20 @@ class TestTGUser:
         except Exception as e:
             pytest.fail(f"Fail to data_drop: {e}")
 
-    def test_full_data_load(self, random_user, csv_worker, user_data):
+    def test_full_data_load(self, random_user, csv_handler, user_data):
         try:
             valid_test_csv = get_csv(get_test_data(0))
-            df = csv_worker.read_csv(valid_test_csv)
-            df = csv_worker.prepare_dataframe(df)
+            df = csv_handler.read_csv(valid_test_csv)
+            df = csv_handler.prepare_dataframe(df)
             # user_data._data_tbl_name = random_user.tg_user_id
             user_data.add_data(df)
         except Exception as e:
             pytest.fail(f"Fail full_data_load: {e}")
 
-    def test_export_data(self, csv_worker, user_data):
+    def test_export_data(self, csv_handler, user_data):
         try:
             df = user_data.get_all_records()
-            file: Path = csv_worker.export_to_csv(df, 'test.csv')
+            file: Path = csv_handler.export_to_csv(df, 'test.csv')
             assert file.is_file() == True, f"Failed to create test output file:'test.csv'"
             file.unlink(missing_ok=True)
         except Exception as e:
@@ -239,3 +239,12 @@ class TestTGUser:
             assert random_user.get_info() is None, f"Info is not deleted: {random_user.get_info()}"
         except Exception as e:
             pytest.fail(f"Fail to del_info: {e}")
+
+
+class TestQFetch:
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_fetch_quote(self, quote_fetcher):
+        q = await quote_fetcher.get_random_quote()
+        print(q)
+        assert q is not None
+        assert len(q) > 0

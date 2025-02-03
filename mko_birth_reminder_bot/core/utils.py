@@ -1,8 +1,7 @@
 from datetime import datetime, date
 from os import PathLike
 import re
-from typing import Dict, Union, List, Optional, Tuple
-from yaml import (safe_load as yaml_safe_load, YAMLError)
+from typing import Dict, Union, List
 import sqlite3
 import logging
 import uuid

@@ -1,7 +1,8 @@
 import logging
 from mko_birth_reminder_bot.core import *
 from pathlib import Path
-from typing import Optional, Dict,Any
+from typing import Optional, Dict, Any
+
 logger = logging.getLogger(__name__)
 
 
@@ -9,6 +10,8 @@ class Operator:
     """
     Class for managing user operations.
     """
+    MAX_RECORDS_PER_USER = 500
+    MAX_USERS_COUNT = 200
 
     def __init__(self, user_id: int):
         """
@@ -20,8 +23,10 @@ class Operator:
         self.user_id = int(user_id)
         self.user = TGUser(self.user_id)
         self.user_data = TGUserData(self.user_id)
-        self.csv_worker = CSVWorker()
+        self.csv_handler = CSVHandler()
         self.user_init()
+
+        self.records_count = self.user_data.count_records()
 
     def user_init(self):
         """
@@ -30,21 +35,29 @@ class Operator:
         if not self.user.is_exist:
             self.user.add_info()
 
-    def import_data(self, csv_file: str|Path) -> str:
+    def import_data(self, csv_file: str | Path) -> str:
         """
         Imports data from a CSV file.
 
         Args:
-            csv_file (Path): Path to the CSV file.
+            csv_file (str | Path): Path to the CSV file.
 
         Returns:
-            str: Success message or error message if an exception occurs.
+            str: A success message or an error message if an exception occurs.
         """
         try:
-            df = self.csv_worker.read_csv(csv_file=csv_file)
-            df = self.csv_worker.prepare_dataframe(df)
+            df = self.csv_handler.read_csv(csv_file=csv_file)
+            df = self.csv_handler.prepare_dataframe(df)
+            df_count = len(df)
+
+            if self.records_count + df_count > Operator.MAX_USERS_COUNT:
+                return ("Unable to load records due to the maximum record limit being reached."
+                        f"\nThe file contains {df_count} records, and you already have {self.records_count} in the database."
+                        f"\nThe allowed maximum is {Operator.MAX_USERS_COUNT}.")
+
             self.user_data.add_data(df)
-            return "Data successfully imported."
+            return f"Data successfully imported. Number of rows: {df_count}."
+
         except Exception as e:
             return str(e)
 
@@ -53,11 +66,11 @@ class Operator:
         Exports user data to a CSV file.
 
         Returns:
-            Path: Path to the exported CSV file.
+            Path: The path to the exported CSV file.
         """
         file_name = utils.generate_random_filename()
         df = self.user_data.get_all_records()
-        return self.csv_worker.export_to_csv(df, file_name)
+        return self.csv_handler.export_to_csv(df, file_name)
 
     def add_record(self, **data) -> str:
         """
@@ -67,11 +80,15 @@ class Operator:
             **data: Record data.
 
         Returns:
-            str: Success message or error message if an exception occurs.
+            str: A success message or an error message if an exception occurs.
         """
         try:
+            if self.records_count + 1 > Operator.MAX_USERS_COUNT:
+                return f"Maximum record limit reached: {Operator.MAX_USERS_COUNT}."
+
             self.user_data.add_record(**data)
             return "Record successfully added."
+
         except Exception as e:
             return str(e)
 
@@ -140,4 +157,4 @@ class Operator:
         Args:
             file (Path): Path to the file to be deleted.
         """
-        self.csv_worker.safe_file_delete(file)
+        self.csv_handler.safe_file_delete(file)

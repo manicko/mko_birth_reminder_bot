@@ -2,20 +2,19 @@ import logging
 import asyncio
 from telethon import TelegramClient, events, Button
 from mko_birth_reminder_bot.reminder import start_scheduler, check_missed_run
-
-from mko_birth_reminder_bot.core import CONFIG
+from mko_birth_reminder_bot.core import CONFIG, DB_CONNECTION
 from mko_birth_reminder_bot.operator import Operator
 
 logger = logging.getLogger(__name__)
 
 client = TelegramClient(**CONFIG.TELETHON_API.client)
-
-
 # Словарь для временного хранения данных пользователей
 user_data = {}
 
 DEFAULT_CAPTION = "Повторите попытку введя команду /start"
 
+# Флаг для отслеживания состояния работы бота
+running = True
 
 async def save_csv_file(event, upload_dir: str = CONFIG.CSV.READ_DATA.path):
     """
@@ -219,6 +218,7 @@ async def handle_callback(event):
     функцией handle_text.
 
     """
+    global client
     user_id = event.sender_id
     if user_id not in user_data:
         await init_user(user_id)
@@ -325,6 +325,7 @@ async def handle_text(event):
     Обрабатывает вводимые пользователем ответы для всех уровней меню,
      используя state для определения текущего состояния меню.
     """
+    global client
     user_id = event.sender_id
 
     if user_id not in user_data:
@@ -372,11 +373,11 @@ async def handle_text(event):
             pass
 
 
-async def main():
+async def run_tg_bot():
     """
-    The main entry point for running the Telegram bot.
+    The run_bot entry point for running the Telegram bot.
     """
-
+    global running
     await client.start(bot_token=CONFIG.TELETHON_API.bot_token)
     logger.info("Telegram bot is running.")
 
@@ -384,8 +385,30 @@ async def main():
     await start_scheduler(client)
     await check_missed_run(client)
 
-    await client.run_until_disconnected()
+    while running:
+        await asyncio.sleep(1)
+
+    # Корректное завершение
+    await stop_tg_bot()
+
+async def stop_tg_bot():
+    """
+    Gracefully stops the Telegram bot and its scheduler.
+    """
+    global running
+    running = False
+    await asyncio.sleep(1)
+    try:
+        if DB_CONNECTION:
+            DB_CONNECTION.commit()  # Сохраняем изменения перед закрытием
+            DB_CONNECTION.close()
+            logger.info("Соединение с базой данных закрыто.")
+    except Exception as e:
+        logger.error(f"Ошибка при закрытии БД: {e}")
+
+    await client.disconnect()
+    logger.info("Telegram bot has been stopped.")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(run_tg_bot())

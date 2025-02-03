@@ -9,9 +9,38 @@ import logging
 from .errors import *
 
 
-class DBWorker:
+def db_connect() -> sqlite3.Connection:
     """
-    Class for working with SQLite database.
+    Establishes a connection to the SQLite database.
+
+    Returns:
+        sqlite3.Connection: Database connection.
+    """
+    try:
+        db_settings = CONFIG.DATABASE
+        db_file = Path(db_settings.path, db_settings.db_file)
+        db_con = sqlite3.connect(db_file, check_same_thread=False)
+        db_con.row_factory = sqlite3.Row
+
+        # Allows using the connection in multiple threads
+        db_con.execute("PRAGMA journal_mode=WAL;")  # Improves multi-threaded access
+        db_con.execute("PRAGMA synchronous=NORMAL;")
+        db_con.execute("PRAGMA foreign_keys=ON;")
+        logging.info("Database initialized.")
+
+        return db_con
+    except sqlite3.Error as e:
+        logging.error(f"Database connection error: {e}")
+        raise e
+
+
+# Global database connection
+DB_CONNECTION = db_connect()
+
+
+class DBHandler:
+    """
+    Class for working with the SQLite database.
     """
     DATA_TO_SQL_PARAMS = {
         'if_exists': 'append',
@@ -21,28 +50,11 @@ class DBWorker:
 
     def __init__(self):
         """
-        Initializes a DBWorker instance.
+        Initializes a DBHandler instance.
         """
         self.db_settings = CONFIG.DATABASE
         self.logger = logging.getLogger(__name__)
-        self.db_con = self._db_connect()
-        self.db_con.row_factory = sqlite3.Row
-
-    def _db_connect(self):
-        """
-        Establishes a connection to the SQLite database.
-
-        Returns:
-            sqlite3.Connection: Database connection.
-        """
-        try:
-            self.db_file = Path(self.db_settings.path, self.db_settings.db_file)
-            db_con = sqlite3.connect(self.db_file)
-            self.logger.info("Database initialized.")
-            return db_con
-        except sqlite3.Error as e:
-            self.logger.error(f"Database connection error: {e}")
-            raise e
+        self.db_con = DB_CONNECTION
 
     def perform_query(
             self,
@@ -136,7 +148,7 @@ class DBWorker:
         self.close()
 
 
-class TGUserData(DBWorker):
+class TGUserData(DBHandler):
     """
     Class for handling user data.
 
@@ -165,6 +177,7 @@ class TGUserData(DBWorker):
         self.default_notice = self.db_settings.default_notice
         self._data_tbl_name = None
         self.notice_before_days_column = self.db_settings.custom_notice_column
+
         if tg_user_id:
             self.data_tbl_name = tg_user_id
 
@@ -198,7 +211,7 @@ class TGUserData(DBWorker):
             int: Number of records added.
         """
         if sql_loader_settings is None:
-            sql_loader_settings = DBWorker.DATA_TO_SQL_PARAMS
+            sql_loader_settings = DBHandler.DATA_TO_SQL_PARAMS
         prepared_data.to_sql(
             **sql_loader_settings,
             name=self._data_tbl_name,
@@ -263,7 +276,7 @@ class TGUserData(DBWorker):
     def count_records(self) -> int:
         query = f"""SELECT COUNT(*) FROM {self._data_tbl_name}"""
         count = self.perform_query(query, fetch='one', raise_exceptions=False)
-        return count[0]
+        return count[0] if isinstance(count, list | tuple | sqlite3.Row) else 0
 
     def get_all_records(self) -> pd.DataFrame:
         """
@@ -344,7 +357,8 @@ class TGUserData(DBWorker):
                 self.logger.error(f"Error deleting record with ID {record_id}: {e}")
                 raise f"Error deleting record with ID {record_id}"
 
-    def _get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
+    def _get_data_in_dates_interval(self, start_date: str, end_date: str) -> Optional[
+        Union[List[sqlite3.Row], sqlite3.Row]]:
         """
         Returns data within a date range.
 
@@ -390,7 +404,8 @@ class TGUserData(DBWorker):
         # (query, (start_date, end_date, end_date, start_date, end_date))
         return self.perform_query(query, params, fetch='all')
 
-    def _get_upcoming_dates(self, notice_period_days: int = 0, date: datetime | None = None) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
+    def _get_upcoming_dates(self, notice_period_days: int = 0, date: datetime | None = None) -> Optional[
+        Union[List[sqlite3.Row], sqlite3.Row]]:
         """
         Fetch users whose birthdays match their 'notice_period_days' days from the current date.
         :return: List of users with matching birthdays.
@@ -448,7 +463,7 @@ class TGUserData(DBWorker):
         return all_reminders
 
 
-class TGUsers(DBWorker):
+class TGUsers(DBHandler):
     TABLE_NAME = 'tg_users'
     TABLE_FIELDS = {
         'tg_user_id': 'INTEGER PRIMARY KEY',
@@ -472,7 +487,7 @@ class TGUsers(DBWorker):
             yield record['tg_user_id']
 
 
-class TGUser(DBWorker):
+class TGUser(DBHandler):
     # TABLE_NAME = 'tg_users'
     # TABLE_FIELDS = {
     #     'tg_user_id': 'INTEGER PRIMARY KEY',

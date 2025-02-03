@@ -8,15 +8,15 @@ from .utils import get_date, get_text, get_dir_content
 from .config import CONFIG
 
 
-class CSVWorker:
+class CSVHandler:
     """
-    CSVWorker class provides functionality to read, clean, and export CSV data.
+    CSVHandler class provides functionality to read, clean, and export CSV data.
     It includes methods for data validation and text cleaning.
     """
 
     def __init__(self) -> None:
         """
-        Initialize the CSVWorker with configuration and logger.
+        Initialize the CSVHandler with configuration and logger.
         """
         # self.config = CONFIG
         self.logger = logging.getLogger(__name__)
@@ -172,7 +172,7 @@ class CSVWorker:
         except Exception as e:
             self.logger.error(f"Failed to delete file {file}: {e}")
 
-    def __enter__(self) -> "CSVWorker":
+    def __enter__(self) -> "CSVHandler":
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:

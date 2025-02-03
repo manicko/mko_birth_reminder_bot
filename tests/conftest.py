@@ -1,11 +1,12 @@
 import pytest
+import pytest_asyncio
 import random
 from pathlib import Path
-from mko_birth_reminder_bot.core import CSVWorker, TGUser, TGUserData, CONFIG
+from mko_birth_reminder_bot.core import CSVHandler, TGUser, TGUserData, CONFIG
+from mko_birth_reminder_bot.quotes import QuoteFetcher
 import faker
 import pandas as pd
 from typing import List, Dict
-
 from .test_data import TestData
 
 
@@ -69,18 +70,18 @@ def generate_valid_test_data(num_records: int = 1) -> list:
 
 
 @pytest.fixture(scope="class")
-def csv_worker():
-    with CSVWorker() as tmp_csv_worker:
-        yield tmp_csv_worker
+def csv_handler():
+    with CSVHandler() as tmp_csv_handler:
+        yield tmp_csv_handler
 
 
 
 @pytest.fixture(scope="class")
 def random_user(random_user_id):  # Возвращает логин
-    with TGUser(random_user_id) as tmp_user_worker:
-        yield tmp_user_worker
+    with TGUser(random_user_id) as tmp_user_handler:
+        yield tmp_user_handler
         # удаляем пользователя из базы в любом случае
-        tmp_user_worker.del_info()
+        tmp_user_handler.del_info()
 
 
 @pytest.fixture(scope="class")
@@ -113,3 +114,8 @@ def cleanup_temp_files(config):
     target_output = Path(config.CSV.EXPORT_DATA.path, 'test_data.csv')
     if target_output.is_file():
         target_output.unlink()
+
+@pytest_asyncio.fixture(loop_scope="module")
+def quote_fetcher():
+    with QuoteFetcher() as f:
+        yield f

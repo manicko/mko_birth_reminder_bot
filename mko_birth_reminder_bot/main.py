@@ -1,8 +1,11 @@
 import click
 import logging
+import asyncio
+import signal
 from mko_birth_reminder_bot.core.config import PATHS
 from mko_birth_reminder_bot.core.config_utils import save_config
-from mko_birth_reminder_bot.core import DBWorker, TGUsers
+from mko_birth_reminder_bot.core import DBHandler, TGUsers
+from mko_birth_reminder_bot.tgbot import run_tg_bot, stop_tg_bot
 
 # Logging setup
 logger = logging.getLogger(__name__)
@@ -35,8 +38,8 @@ def export_single_config(config_name: str) -> None:
 
 def initialize_database():
     """Initializes the database by creating the required table."""
-    with DBWorker() as db_worker:
-        db_worker.create_table(TGUsers.TABLE_NAME, TGUsers.TABLE_FIELDS)
+    with DBHandler() as db_handler:
+        db_handler.create_table(TGUsers.TABLE_NAME, TGUsers.TABLE_FIELDS)
 
 
 @cli.command()
@@ -74,5 +77,38 @@ def init_db() -> None:
         click.echo(f"Error initializing database: {e}", err=True)
 
 
+@cli.command()
+def run_bot() -> None:
+    """
+    Starts the Telegram bot and its scheduler.
+
+    This function initializes and runs the Telegram bot using the Telethon library.
+    It also starts the scheduled tasks associated with the bot. If an error occurs
+    during execution, an error message is displayed.
+
+    Raises:
+        Exception: If an error occurs while launching the bot.
+    """
+    try:
+        asyncio.run(run_tg_bot())  # Start the bot in a new event loop
+        click.echo(
+            "Bot launched successfully. "
+            "To verify, contact the bot via Telegram using its username (starting with '@') "
+            "and send the '/start' command."
+        )
+    except Exception as e:
+        click.echo(f"Error launching the bot: {e}", err=True)
+
+
+def handle_signal(signal_number, frame):
+    """
+    Обработчик сигналов SIGINT (Ctrl+C) и SIGTERM (kill).
+    """
+    logger.info(f"Получен сигнал {signal_number}. Завершаем бота...")
+    asyncio.create_task(stop_tg_bot())
+
+
 if __name__ == "__main__":
     cli()
+    signal.signal(signal.SIGINT, handle_signal)  # Ctrl+C
+    signal.signal(signal.SIGTERM, handle_signal)  # kill

@@ -10,6 +10,8 @@ from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime, timedelta
 from typing import Optional, Union
 from mko_birth_reminder_bot.core import CONFIG, TGUsers, TGUserData
+from mko_birth_reminder_bot.quotes import QuoteFetcher
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,7 @@ STATE_FILE = CONFIG.REMINDER.state_file
 TIMEZONE = CONFIG.REMINDER.timezone
 TRIGGER_ARGS = CONFIG.REMINDER.trigger
 COLUMNS_TO_SEND = CONFIG.REMINDER.columns_to_send
+scheduler: AsyncIOScheduler | None = None
 
 
 def save_state(last_run: datetime) -> None:
@@ -78,12 +81,19 @@ async def generate_msgs(queue: asyncio.Queue, date: Union[datetime, None] = None
         date (Optional[datetime], optional): Specific date for reminders. Defaults to None.
     """
     tg_users: TGUsers = TGUsers()
-    for user_id in tg_users.iter_ids():
-        user_data: TGUserData = TGUserData(user_id)
-        data = user_data.get_all_reminders(date=date)
-        msg = beautify_table(data)
-        if msg:
-            await queue.put((user_id, msg))
+
+    async with QuoteFetcher() as q_fetcher:
+        for user_id in tg_users.iter_ids():
+            user_data: TGUserData = TGUserData(user_id)
+            data = user_data.get_all_reminders(date=date)
+            msg = beautify_table(data)
+
+            if msg is None:
+                msg = await q_fetcher.get_random_quote()
+                await asyncio.sleep(randint(1, 3))
+            if msg:
+                await queue.put((user_id, msg))
+
 
 
 async def process_msgs(client: TelegramClient, queue: asyncio.Queue) -> None:
@@ -171,8 +181,22 @@ async def start_scheduler(client: TelegramClient) -> None:
     Args:
         client (TelegramClient): The Telegram client.
     """
+    global scheduler
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
     trigger = CronTrigger(**TRIGGER_ARGS)
     scheduler.add_job(task_to_run, trigger, args=[client])
     scheduler.start()
     logging.info(f"Scheduler started. Next message at {TRIGGER_ARGS['hour']}:{TRIGGER_ARGS['minute']} ({TIMEZONE}).")
+
+
+async def stop_scheduler() -> None:
+    """
+    Stops the running scheduler if it is active.
+    """
+    global scheduler
+    if scheduler and scheduler.running:
+        scheduler.shutdown(wait=False)  # Stop the scheduler without waiting for jobs to finish
+        logging.info("Scheduler has been stopped.")
+        scheduler = None  # Clear the reference
+    else:
+        logging.info("Scheduler is not running.")
