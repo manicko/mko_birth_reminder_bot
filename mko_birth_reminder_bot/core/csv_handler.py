@@ -8,6 +8,8 @@ from .utils import get_date, get_text, get_dir_content
 from .config import CONFIG
 
 
+logger = logging.getLogger(__name__)
+
 class CSVHandler:
     """
     CSVHandler class provides functionality to read, clean, and export CSV data.
@@ -19,7 +21,7 @@ class CSVHandler:
         Initialize the CSVHandler with configuration and logger.
         """
         # self.config = CONFIG
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         self.data_column_names: List[str] = self._get_columns(CONFIG.DATABASE.columns)
 

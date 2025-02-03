@@ -31,7 +31,7 @@ def export_single_config(config_name: str) -> None:
         config = PATHS.config_files[config_name]
         save_config(file_from=PATHS.default_settings / config,
                     file_to=PATHS.user_settings / config)
-        click.echo(f"File {config} successfully exported.")
+        click.echo(f"File {config} successfully exported to '{PATHS.user_settings/config}'")
     else:
         raise ValueError(f"Config name {config_name} not found.")
 

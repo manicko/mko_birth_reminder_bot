@@ -8,6 +8,7 @@ from .utils import data_validation, dict_from_row
 import logging
 from .errors import *
 
+logger = logging.getLogger(__name__)
 
 def db_connect() -> sqlite3.Connection:
     """
@@ -30,7 +31,7 @@ def db_connect() -> sqlite3.Connection:
 
         return db_con
     except sqlite3.Error as e:
-        logging.error(f"Database connection error: {e}")
+        logger.error(f"Database connection error: {e}")
         raise e
 
 
@@ -53,7 +54,7 @@ class DBHandler:
         Initializes a DBHandler instance.
         """
         self.db_settings = CONFIG.DATABASE
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         self.db_con = DB_CONNECTION
 
     def perform_query(
