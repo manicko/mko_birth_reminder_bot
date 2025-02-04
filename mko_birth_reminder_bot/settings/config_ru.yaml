@@ -46,21 +46,22 @@
   "TELETHON_API": {
     "menu": {
       "start": [
-        [ { "add_record": "Add Record" } ],
-        [ { "update_record_by_id": "Edit Record by ID" },
-          { "delete_record_by_id": "Delete Record by ID" } ],
-        [ { "import_csv": "Import from CSV" }, { "export_csv": "Export to CSV" } ],
-        [ { "delete_user": "Delete Data" } ],
+        [ { "add_record": "Добавить запись" } ],
+        [ { "update_record_by_id": "Скорректировать запись по id" },
+          { "delete_record_by_id": "Скорректировать запись по id" } ],
+        [ { "import_csv": "Импорт из csv" }, { "export_csv": "Экспорт в csv" } ],
+        [ { "delete_user": "Отписаться" } ],
       ],
       "add_record": [
-        [ { "back_to_start": "Back" } ],
-        [ { "company": "Company" }, { "position": "Position" } ],
-        [ { "gift_category": "Gift Category" } ],
-        [ { "first_name": "First Name" }, { "last_name": "Last Name" } ],
-        [ { "birth_date": "Date of Birth" }, { "notice_before_days": "Notify Before (Days)" } ],
-        [ { "confirm_data": "Confirm" } ],
+        [ { "back_to_start": "Назад" } ],
+        [ { "company": "Компания" }, { "position": "Должность" } ],
+        [ { "gift_category": "Категория подарка" } ],
+        [ { "first_name": "Имя" }, { "last_name": "Фамилия" } ],
+        [ { "birth_date": "День рождения" }, { "notice_before_days": "За сколько дней предупредить" } ],
+        [ { "confirm_data": "Подтвердить" } ],
       ]
-    }
+    },
+
   },
   "REMINDER": {
     "timezone": "Europe/Moscow",

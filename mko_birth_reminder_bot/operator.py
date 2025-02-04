@@ -61,7 +61,7 @@ class Operator:
         except Exception as e:
             return str(e)
 
-    def export_data(self) -> Path:
+    def export_data(self) -> str | Path:
         """
         Exports user data to a CSV file.
 

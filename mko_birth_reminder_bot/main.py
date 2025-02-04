@@ -31,7 +31,7 @@ def export_single_config(config_name: str) -> None:
         config = PATHS.config_files[config_name]
         save_config(file_from=PATHS.default_settings / config,
                     file_to=PATHS.user_settings / config)
-        click.echo(f"File {config} successfully exported to '{PATHS.user_settings/config}'")
+        click.echo(f"File {config} successfully exported to '{PATHS.user_settings / config}'")
     else:
         raise ValueError(f"Config name {config_name} not found.")
 
@@ -90,25 +90,32 @@ def run_bot() -> None:
         Exception: If an error occurs while launching the bot.
     """
     try:
-        asyncio.run(run_tg_bot())  # Start the bot in a new event loop
+        click.echo("Launching the bot... Press Ctrl+C to stop.")
+        asyncio.run(run_tg_bot())  # Безопасный запуск и завершение event loop
         click.echo(
             "Bot launched successfully. "
             "To verify, contact the bot via Telegram using its username (starting with '@') "
             "and send the '/start' command."
         )
+    except KeyboardInterrupt:
+        click.echo("Stopping the bot...")
+        asyncio.run(stop_tg_bot())  # Корректное завершение
     except Exception as e:
         click.echo(f"Error launching the bot: {e}", err=True)
 
 
+
+
 def handle_signal(signal_number, frame):
     """
-    Обработчик сигналов SIGINT (Ctrl+C) и SIGTERM (kill).
+    Handles SIGINT (Ctrl+C) and SIGTERM (kill).
     """
-    logger.info(f"Получен сигнал {signal_number}. Завершаем бота...")
-    asyncio.create_task(stop_tg_bot())
+    logger.info(f"Received signal {signal_number}. Stopping the bot...")
+    asyncio.create_task(stop_tg_bot())  # Stops the bot asynchronously
 
+# Register signal handlers **before** running CLI
+signal.signal(signal.SIGINT, handle_signal)  # Ctrl+C
+signal.signal(signal.SIGTERM, handle_signal)  # kill
 
 if __name__ == "__main__":
     cli()
-    signal.signal(signal.SIGINT, handle_signal)  # Ctrl+C
-    signal.signal(signal.SIGTERM, handle_signal)  # kill
