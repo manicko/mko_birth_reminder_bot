@@ -49,7 +49,7 @@
         [ { "add_record": "Добавить запись" } ],
         [ { "update_record_by_id": "Скорректировать запись по id" },
           { "delete_record_by_id": "Скорректировать запись по id" } ],
-        [ { "import_csv": "Импорт из csv" }, { "export_csv": "Экспорт в csv" } ],
+        [ { "import_csv": "Импорт из CSV" }, { "export_csv": "Экспорт в CSV" } ],
         [ { "delete_user": "Отписаться" } ],
       ],
       "add_record": [

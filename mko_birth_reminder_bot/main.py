@@ -91,12 +91,10 @@ def run_bot() -> None:
     """
     try:
         click.echo("Launching the bot... Press Ctrl+C to stop.")
+        click.echo("To verify, contact the bot via Telegram using its username (starting with '@') "
+        "and send the '/start' command.")
         asyncio.run(run_tg_bot())  # Безопасный запуск и завершение event loop
-        click.echo(
-            "Bot launched successfully. "
-            "To verify, contact the bot via Telegram using its username (starting with '@') "
-            "and send the '/start' command."
-        )
+
     except KeyboardInterrupt:
         click.echo("Stopping the bot...")
         asyncio.run(stop_tg_bot())  # Корректное завершение
@@ -110,6 +108,7 @@ def handle_signal(signal_number, frame):
     """
     Handles SIGINT (Ctrl+C) and SIGTERM (kill).
     """
+    click.echo(f"Received signal {signal_number}. Stopping the bot...")
     logger.info(f"Received signal {signal_number}. Stopping the bot...")
     asyncio.create_task(stop_tg_bot())  # Stops the bot asynchronously
 
