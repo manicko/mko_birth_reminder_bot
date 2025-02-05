@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 client = TelegramClient(**CONFIG.TELETHON_API.client)
 user_data = {}  # Dictionary for temporary user data storage
 running = True  # Flag to track bot status
-DEFAULT_CAPTION = "Repeat the attempt by entering the /start command."
+UNEXPECTED_ERROR_CAPTION = "Unexpected error. Repeat the attempt by entering the /start command."
 
 
 async def save_csv_file(event, user_id: int, upload_dir: str = CONFIG.CSV.READ_DATA.path):
@@ -208,7 +208,7 @@ async def ask_for_input(event, user_id, param_name, prompt_text):
     """
     if user_id not in user_data:
         logger.error(f"User ID {user_id} not found while requesting input.")
-        prompt_text = "Unexpected error. Please try again from the /start command."
+        prompt_text = UNEXPECTED_ERROR_CAPTION
 
     user_data[user_id]['waited_param_name'] = param_name  # Store the expected parameter
     await handle_edit_respond(event, prompt_text)
@@ -287,8 +287,9 @@ async def validate_record(event, user_id) -> bool:
     Validates the user's input record and prompts for missing fields if necessary.
 
     This function checks whether the required `birth_date` field is present in the user's data.
-    If it is missing, the function prompts the user to enter it. Otherwise, it displays the
-    entered data.
+    - If `birth_date` exists or the user is in the `update_record_by_id_state`, the function displays
+      the entered data and returns `True`.
+    - If `birth_date` is missing, the function prompts the user to enter it and returns `False`.
 
     Args:
         event (Union[telethon.events.NewMessage.Event, telethon.events.CallbackQuery.Event]):
@@ -296,7 +297,7 @@ async def validate_record(event, user_id) -> bool:
         user_id (int): The Telegram user ID.
 
     Returns:
-        None: The function interacts with the user via messages but does not return a value.
+        bool: True if the record is complete, False if additional input is required.
     """
     user_info = user_data[user_id].get('params', {})
 
@@ -309,6 +310,7 @@ async def validate_record(event, user_id) -> bool:
         await handle_edit_respond(event, text=prompt, rewrite=True)
         await show_add_record_menu(event, rewrite=False)
         return False
+
 
 @client.on(events.NewMessage(pattern="/start"))
 async def start(event):
@@ -325,14 +327,21 @@ async def handle_callback(event):
     Handles button clicks in the Telegram bot menu.
 
     This function processes user interactions with the bot's inline keyboard
-    and updates the user's state accordingly. It supports operations such as
-    adding, updating, and deleting records, as well as importing/exporting data.
+    and updates the user's state accordingly. It supports operations such as:
+    - Adding, updating, and deleting records by ID.
+    - Importing and exporting CSV data.
+    - Managing user input for various parameters.
+    - Navigating between menu sections.
+
+    Depending on the button pressed, the function may request additional input
+    from the user or execute a predefined operation.
 
     Args:
-        event (telethon.events.CallbackQuery.Event): The event triggered by a button press.
+        event (telethon.events.CallbackQuery.Event):
+            The event triggered by a button press.
 
     Returns:
-        None: The function sends messages and updates user data but does not return a value.
+        None: This function interacts with the user via messages but does not return a value.
     """
 
     user_id = event.sender_id
@@ -400,28 +409,48 @@ async def handle_callback(event):
             await show_start_menu(event, user_id, rewrite=False)
 
         # Data entry menu
-        case "company" | "position" | "gift_category" | "first_name" | "last_name" | \
-             "birth_date" | "notice_before_days" as choice:
-            prompt = f"Enter {get_prompt_from_config(choice, CONFIG.TELETHON_API.menu)}"
+        case "birth_date" as choice:
+            prompt = get_prompt_from_config(choice, CONFIG.TELETHON_API.menu)
+            prompt = f"Enter {prompt}"
+            prompt += "\nFormat: dd/mm/yyyy (e.g. 01/03/2000)"
+            await ask_for_input(event, user_id, "birth_date", prompt)
+
+        case "company" | "position" | "gift_category" | "first_name" | \
+             "last_name" | "notice_before_days" as choice:
+            prompt = get_prompt_from_config(choice, CONFIG.TELETHON_API.menu)
+            prompt = f"Enter {prompt}"
             await ask_for_input(event, user_id, choice, prompt)
 
         case "confirm_data":
             is_valid = await validate_record(event, user_id)
-            if is_valid:
-                caption = DEFAULT_CAPTION
-                match user_data[user_id]['state']:
-                    case "add_record_state":
+            if not is_valid:
+                return
+
+            match user_data[user_id].get('state'):
+                case "add_record_state":
+                    try:
                         caption = await asyncio.to_thread(
                             operator.add_record, **user_data[user_id]['params']
                         )
-                    case "update_record_by_id_state":
-                        caption = await asyncio.to_thread(
-                            operator.update_record_by_id,
-                            **user_data[user_id]['params']
-                        )
+                    except Exception as e:
+                        logger.error(f"Error adding record: {e}")
+                        caption = UNEXPECTED_ERROR_CAPTION
 
-                await client.send_message(user_id, caption)
-                await show_start_menu(event, user_id, rewrite=False)
+                case "update_record_by_id_state":
+                    try:
+                        caption = await asyncio.to_thread(
+                            operator.update_record_by_id, **user_data[user_id]['params']
+                        )
+                    except Exception as e:
+                        logger.error(f"Error updating record: {e}")
+                        caption = UNEXPECTED_ERROR_CAPTION
+
+                case _:
+                    logger.error(f"Unexpected state: {user_data[user_id].get('state')}")
+                    caption = UNEXPECTED_ERROR_CAPTION
+
+            await client.send_message(user_id, caption)  # Всегда отправляем сообщение
+            await show_start_menu(event, user_id, rewrite=False)  # Всегда показываем меню
 
         # case "accept_input":
         #     await show_add_record_menu(event, user_id)
