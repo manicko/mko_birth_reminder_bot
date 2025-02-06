@@ -8,6 +8,7 @@ from mko_birth_reminder_bot.core.config_utils import (
     load_config, resolve_path, merge_dicts
 )
 
+
 class WorkingPaths(BaseSettings):
     """
     Defines essential working paths for configuration and user data.
@@ -31,13 +32,17 @@ class WorkingPaths(BaseSettings):
         "extra": "ignore"
     }
 
+
 PATHS = WorkingPaths()
+
 
 # Database settings
 class DatabaseSettings(BaseModel):
     """
     Configuration settings for the SQLite database.
     """
+    users_limit: int = 200
+    records_limit: int = 500
     path: Path | str = Field(default=Path("data"))
     db_file: Path | str = Field(default=Path("birthdays.db"))
     columns: dict[str, str] = {
@@ -60,11 +65,13 @@ class DatabaseSettings(BaseModel):
     def validate_paths(cls, v: str | Path) -> Path:
         return resolve_path(v, PATHS.user_folder)
 
+
 # CSV settings
 class CsvSettings(BaseModel):
     """
     Configuration settings for CSV file handling.
     """
+
     class ReadDataSettings(BaseModel):
         path: Path | str = Field(default=Path("tmp"))
         delete_after: int = 3
@@ -87,6 +94,7 @@ class CsvSettings(BaseModel):
     READ_DATA: ReadDataSettings
     EXPORT_DATA: ExportDataSettings
 
+
 # Telethon API settings
 class TelethonApiSettings(BaseModel):
     """
@@ -95,6 +103,7 @@ class TelethonApiSettings(BaseModel):
     menu: dict[str, list[list[dict[str, str]]]]
     bot_token: str
     client: dict[str, Any]
+
 
 # Reminder settings
 class ReminderSettings(BaseModel):
@@ -110,6 +119,7 @@ class ReminderSettings(BaseModel):
     @classmethod
     def validate_paths(cls, v: str | Path) -> Path:
         return resolve_path(v, PATHS.user_folder)
+
 
 # Logging settings
 class LoggingSettings(BaseModel):
@@ -134,6 +144,7 @@ class LoggingSettings(BaseModel):
                 filename = handler["filename"]
                 handler["filename"] = resolve_path(filename, PATHS.user_folder / "logs")
         return handlers
+
 
 # Main configuration class
 class Config(BaseSettings):
@@ -165,6 +176,7 @@ class Config(BaseSettings):
                 merge_dicts(merged_config, data)  # Merge configs
 
         return cls.model_validate(merged_config)
+
 
 # Load the final configuration
 CONFIG = Config.load()

@@ -1,0 +1,31 @@
+# Systemd 'unit' file.
+# Copy (or link) them to /usr/lib/systemd/system or etc/systemd/system
+# sudo touch /etc/systemd/system/mko_birth_reminder_bot.service
+# sudo nano /etc/systemd/system/mko_birth_reminder_bot.service
+# sudo systemctl daemon-reload
+# sudo systemctl enable mko_birth_reminder_bot.service
+# sudo systemctl start mko_birth_reminder_bot.service
+
+# check status
+# sudo systemctl status mko_birth_reminder_bot
+
+# stop / restart
+# sudo systemctl stop mko_birth_reminder_bot
+# sudo systemctl restart mko_birth_reminder_bot
+
+[Unit]
+Description=MKOBirthReminder Telegram Bot
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 -m mko_birth_reminder_bot.main run-bot
+WorkingDirectory=/path/to/your/project
+Restart=always
+RestartSec=5s
+User=youruser
+Group=yourgroup
+StandardOutput=append:/var/log/mko_birth_reminder_bot.log
+StandardError=append:/var/log/mko_birth_reminder_bot.log
+
+[Install]
+WantedBy=multi-user.target

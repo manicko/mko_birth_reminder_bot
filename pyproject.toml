@@ -11,12 +11,9 @@ authors = [
 
 description = "Telegram birth reminder bot built on Telethon."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "aiohttp>=3.11.11",
-    "annotated-types>=0.7.0",
-    "typing_extensions>=4.12.2",
-    "APScheduler>=3.11.0",
     "beautifulsoup4>=4.13.0",
     "click>=8.1.8",
     "pandas>=2.2.3",
@@ -28,25 +25,23 @@ dependencies = [
     "pytz>=2025.1",
     "PyYAML>=6.0.2",
     "Telethon>=1.38.1",
-    "tzdata>=2025.1",
+    "APScheduler>=3.11.0",
     "pytest>=8.3.4",
     "Faker>=35.2.0",
     "freezegun>=1.5.1",
+    "pytest-asyncio>=0.25.3",
 ]
 
 classifiers = [
-    'Programming Language :: Python :: 3.10',
-    'Programming Language :: Python :: 3.11',
-    'Programming Language :: Python :: 3.12',
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 
 [project.urls]
 Homepage = "https://github.com/manicko/mko_birth_reminder_bot"
-Issues = "https://github.com/manicko/mko_birth_reminder_bot"
-
+Repository = "https://github.com/manicko/mko_birth_reminder_bot"
+Issues = "https://github.com/manicko/mko_birth_reminder_bot/issues"
 
 [tool.setuptools]
 # https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
@@ -54,14 +49,14 @@ platforms = ["Linux", "Windows"]
 include-package-data = true
 
 [tool.setuptools.packages.find]
-where = ["mko_birth_reminder_bot"]  # list of folders that contain the packages (["."] by default)
+where = ["."]  # list of folders that contain the packages (["."] by default)
 include = ["mko_birth_reminder_bot*", "mko_birth_reminder_bot.settings"]  # package names should match these glob patterns (["*"] by default)
-#exclude = ["my_package.tests*"]  # exclude packages matching these glob patterns (empty by default)
+exclude = ["tests/.pytest_cache*"]  # exclude packages matching these glob patterns (empty by default)
 namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
 
 
 [tool.pytest.ini_options]
-minversion = "6.0"
+minversion = "8.0"
 addopts = "-ra -q"
 #-ra: This combines two options: -r (report summary at the end) and
 # -a (all except passed). It means that Pytest will display a summary report
@@ -71,4 +66,4 @@ addopts = "-ra -q"
 # It suppresses most of the output, making the test run less verbose.
 
 console_output_style = "classic"
-testpaths = [ "tests"]
+testpaths = ["tests"]

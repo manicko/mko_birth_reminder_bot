@@ -1,0 +1,8 @@
+include README.md
+include LICENSE.txt
+include requirements.txt
+include tests
+recursive-include mko_birth_reminder_bot *.json *.yaml
+exclude *.git
+global-exclude tests/.pytest_cache/*
+global-exclude *.pyc *.o *.session *.pytest_cache *.cache

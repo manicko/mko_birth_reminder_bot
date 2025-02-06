@@ -7,8 +7,8 @@ from .errors import *
 from .utils import get_date, get_text, get_dir_content
 from .config import CONFIG
 
-
 logger = logging.getLogger(__name__)
+
 
 class CSVHandler:
     """
@@ -26,7 +26,7 @@ class CSVHandler:
         self.data_column_names: List[str] = self._get_columns(CONFIG.DATABASE.columns)
 
         self.date_column = CONFIG.DATABASE.date_column
-        self.date_format= CONFIG.DATABASE.date_format
+        self.date_format = CONFIG.DATABASE.date_format
 
         self.import_path = CONFIG.CSV.READ_DATA.path
         self.reader_settings = CONFIG.CSV.READ_DATA.from_csv
@@ -35,7 +35,6 @@ class CSVHandler:
         self.export_settings = CONFIG.CSV.EXPORT_DATA.to_csv
 
         self.delete_files_after = CONFIG.CSV.READ_DATA.delete_after
-
 
     def read_csv(self, csv_file: str) -> pd.DataFrame:
         """
@@ -54,10 +53,11 @@ class CSVHandler:
             actual_columns = len(first_row.columns)
             expected_columns = len(self.data_column_names)
 
-            if actual_columns != expected_columns:
+            if actual_columns != expected_columns and actual_columns != expected_columns + 1:
                 raise ColumnMismatch(f"Expected {expected_columns} columns, but got {actual_columns}.")
 
-            df = pd.read_csv(file_path, names=self.data_column_names, **self.reader_settings)
+            df = pd.read_csv(file_path, **self.reader_settings)
+
             self.logger.info(f"Successfully read CSV file: {file_path.name}")
             return df
 
@@ -104,6 +104,8 @@ class CSVHandler:
         :param date_column: Column name with date values.
         :return: DataFrame with valid date values.
         """
+        if dataframe.shape[1] == 0:
+            return pd.DataFrame()
         valid_rows = []
         for _, row in dataframe.iterrows():
             res = get_date(row[date_column])
@@ -124,24 +126,60 @@ class CSVHandler:
         :param date_column: Column name with date values.
         :return: DataFrame with cleaned text data.
         """
+        if dataframe.shape[1] == 0:
+            return pd.DataFrame()
+
         for col in column_names:
             if col != date_column:
                 dataframe[col] = dataframe[col].astype(str).apply(get_text)
         return dataframe
 
+    def remove_index_column_if_present(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        """
+        Checks if the first column in the DataFrame contains only numeric values (assuming it's an index column).
+        If so, it removes the first column and returns the modified DataFrame.
+
+        Args:
+            dataframe (pd.DataFrame): Input DataFrame that may contain an unnecessary index column.
+
+        Returns:
+            pd.DataFrame: DataFrame with the first column removed if it was an index column.
+                          Returns dataframe without changes if error.
+        """
+        try:
+            # Drop the first column, supposing it's an index
+             dataframe = dataframe.iloc[:, 1:]
+        except Exception as e:
+            self.logger.error(f"Unexpected error while handling index column: {e}")
+        finally:
+            return dataframe
+
     def prepare_dataframe(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         """
         Cleans and validates the input DataFrame before exporting or storing.
 
-        :param dataframe: Input DataFrame with raw data.
-        :return: Cleaned DataFrame ready for use.
+        Steps:
+        - Checks for an unnecessary index column and removes it.
+        - Ensures column count matches expected values.
+        - Cleans date and text columns.
+
+        Args:
+            dataframe (pd.DataFrame): Raw input DataFrame.
+
+        Returns:
+            pd.DataFrame: Cleaned DataFrame ready for export or further processing.
+                          Returns an empty DataFrame if validation fails.
         """
+
+        if dataframe.shape[1] == len(self.data_column_names) + 1:
+            dataframe = self.remove_index_column_if_present(dataframe)
+
         if len(dataframe.columns) != len(self.data_column_names):
-            self.logger.error("Column count mismatch. Data loading aborted.")
+            self.logger.error("Column count mismatch detected. Data processing halted.")
             return pd.DataFrame()
 
         len_raw_data = len(dataframe)
-        dataframe.columns = self.data_column_names
+        dataframe.columns = self.data_column_names # set dataframe header
 
         # Clean date column
         dataframe = self._clean_date_column(dataframe, self.date_column)
@@ -149,8 +187,8 @@ class CSVHandler:
         # Clean text columns
         dataframe = self._clean_text_columns(dataframe, self.data_column_names, self.date_column)
 
-        self.logger.info(f"Data successfully cleaned. Loaded rows: {len(dataframe)}."
-                         f" Skipped rows: {len_raw_data - len(dataframe)}.")
+        self.logger.info(f"Data successfully cleaned. Loaded rows: {len(dataframe)}. "
+                         f"Skipped rows: {len_raw_data - len(dataframe)}.")
         return dataframe
 
     def cleanup_tmp(self, ext: set = ('csv', 'txt')) -> None:
@@ -162,7 +200,6 @@ class CSVHandler:
             for file in get_dir_content(self.import_path, ext):
                 if datetime.fromtimestamp(file.stat().st_mtime) < cutoff_date:
                     self.safe_file_delete(file)
-
 
     def safe_file_delete(self, file: Path) -> None:
         """

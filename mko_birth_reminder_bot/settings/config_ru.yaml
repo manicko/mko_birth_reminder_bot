@@ -1,5 +1,7 @@
 {
   "DATABASE": {
+    "users_limit": 200,
+    "records_limit": 500,
     "path": "data",
     "db_file": "birthdays.db",
     "columns": {

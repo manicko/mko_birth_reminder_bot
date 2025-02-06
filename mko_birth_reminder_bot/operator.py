@@ -10,8 +10,8 @@ class Operator:
     """
     Class for managing user operations.
     """
-    MAX_RECORDS_PER_USER = 500
-    MAX_USERS_COUNT = 200
+    RECORDS_LIMIT = CONFIG.DATABASE.records_limit
+    USERS_LIMIT = CONFIG.DATABASE.users_limit
 
     def __init__(self, user_id: int):
         """
@@ -46,20 +46,20 @@ class Operator:
             str: A success message or an error message if an exception occurs.
         """
         try:
+
             df = self.csv_handler.read_csv(csv_file=csv_file)
             df = self.csv_handler.prepare_dataframe(df)
-            df_count = len(df)
-
-            if self.records_count + df_count > Operator.MAX_USERS_COUNT:
+            df_count = len(df) # number of rows
+            if self.records_count + df_count > Operator.USERS_LIMIT:
                 return ("Unable to load records due to the maximum record limit being reached."
                         f"\nThe file contains {df_count} records, and you already have {self.records_count} in the database."
-                        f"\nThe allowed maximum is {Operator.MAX_USERS_COUNT}.")
-
-            self.user_data.add_data(df)
+                        f"\nThe allowed maximum is {Operator.USERS_LIMIT}.")
+            if df_count > 0:
+                self.user_data.add_data(df)
             return f"Data successfully imported. Number of rows: {df_count}."
 
         except Exception as e:
-            return str(e)
+            return f"Unexpected error occurred while importing the file: {str(e)}"
 
     def export_data(self) -> str | Path:
         """
@@ -83,8 +83,8 @@ class Operator:
             str: A success message or an error message if an exception occurs.
         """
         try:
-            if self.records_count + 1 > Operator.MAX_USERS_COUNT:
-                return f"Maximum record limit reached: {Operator.MAX_USERS_COUNT}."
+            if self.records_count + 1 > Operator.USERS_LIMIT:
+                return f"Maximum record limit reached: {Operator.USERS_LIMIT}."
 
             self.user_data.add_record(**data)
             return "Record successfully added."

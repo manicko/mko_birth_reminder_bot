@@ -214,7 +214,7 @@ async def ask_for_input(event, user_id, param_name, prompt_text):
     await handle_edit_respond(event, prompt_text)
 
 
-#
+
 # async def handle_data_entry(event, user_id: int):
 #     """
 #     Processes user input at level 3 of the menu.
@@ -352,7 +352,8 @@ async def handle_callback(event):
     operator: Operator = Operator(user_id)
 
     match data:
-        # Start menu
+
+        # Start menu 1st level
         case "add_record":
             user_data[user_id]['state'] = "add_record_state"
             await show_add_record_menu(event, user_id)
@@ -360,7 +361,6 @@ async def handle_callback(event):
         case "back_to_start":
             await show_start_menu(event, user_id)
 
-        # Record actions (by ID)
         case "update_record_by_id":
             user_data[user_id]['state'] = "update_record_by_id_state"
 
@@ -381,7 +381,6 @@ async def handle_callback(event):
                 "Enter the ID of the record you want to delete."
             )
 
-        # Import / Export
         case "import_csv":
             user_data[user_id]['state'] = "import_csv_state"
             await ask_for_input(
@@ -408,7 +407,7 @@ async def handle_callback(event):
             await event.edit("Your data has been deleted.")
             await show_start_menu(event, user_id, rewrite=False)
 
-        # Data entry menu
+        # Data entry menu 2nd level
         case "birth_date" as choice:
             prompt = get_prompt_from_config(choice, CONFIG.TELETHON_API.menu)
             prompt = f"Enter {prompt}"
@@ -452,14 +451,16 @@ async def handle_callback(event):
             await client.send_message(user_id, caption)  # Всегда отправляем сообщение
             await show_start_menu(event, user_id, rewrite=False)  # Всегда показываем меню
 
+        # The below section target is to be used with handle_data_entry function
+        # if we need to ask the user to confirm his choice
         # case "accept_input":
         #     await show_add_record_menu(event, user_id)
 
-        case "cancel_input":
-            param_name = user_data[user_id].get('waited_param_name')
-            if param_name:
-                user_data[user_id]['params'].pop(param_name, None)  # Remove current input
-            await ask_for_input(event, user_id, param_name, f"Enter {param_name} again:")
+        # case "cancel_input":
+        #     param_name = user_data[user_id].get('waited_param_name')
+        #     if param_name:
+        #         user_data[user_id]['params'].pop(param_name, None)  # Remove current input
+        #     await ask_for_input(event, user_id, param_name, f"Enter {param_name} again:")
 
 
 # noinspection PyTypeChecker
@@ -500,7 +501,6 @@ async def handle_text(event):
             record_id = event.raw_text
             caption = await asyncio.to_thread(operator.delete_record_by_id, record_id)
             await client.send_message(event.chat_id, caption)
-            await drop_user_state(user_id)  # Reset user state after deletion
             await show_start_menu(event, user_id, rewrite=False)
 
         case 'import_csv_state':
@@ -510,7 +510,8 @@ async def handle_text(event):
 
             if file:
                 text = await asyncio.to_thread(operator.import_data, file)
-                await msg.respond(text)
+                event = await msg.respond(text)
+                await show_start_menu(event, user_id, rewrite=False)
 
         case 'export_csv_state':
             # Export CSV is handled via CallbackQuery
