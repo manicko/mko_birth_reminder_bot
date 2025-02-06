@@ -52,7 +52,8 @@
         [ { "update_record_by_id": "Edit Record by ID" },
           { "delete_record_by_id": "Delete Record by ID" } ],
         [ { "import_csv": "Import from CSV" }, { "export_csv": "Export to CSV" } ],
-        [ { "delete_user": "Delete All Records" } ],
+        [ { "delete_all_records": "Delete All Records" } ],
+        [ { "delete_user": "Unsubscribe" } ],
       ],
       "add_record": [
         [ { "back_to_start": "Back" } ],

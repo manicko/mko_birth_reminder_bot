@@ -402,10 +402,14 @@ async def handle_callback(event):
                 caption = "Failed to export the file. Please contact the developers for assistance."
                 await client.send_message(user_id, caption)
 
-        case "delete_user":
+        case "delete_all_records":
             await asyncio.to_thread(operator.flush_data)
-            await event.edit("Your data has been deleted.")
+            await event.edit("All your data has been deleted.")
             await show_start_menu(event, user_id, rewrite=False)
+
+        case "delete_user":
+            await asyncio.to_thread(operator.del_info)
+            await event.edit("All your data has been deleted, and you have been successfully unsubscribed.")
 
         # Data entry menu 2nd level
         case "birth_date" as choice:
