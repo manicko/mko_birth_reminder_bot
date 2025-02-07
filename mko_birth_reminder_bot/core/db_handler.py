@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
 from .config import CONFIG
-from .utils import data_validation, dict_from_row
+from .utils import validate_data, rows_to_dict_list
 import logging
 from .errors import *
 
@@ -242,7 +242,7 @@ class TGUserData(DBHandler):
 
         Behavior:
         --------
-        - Validates the provided data using the `data_validation` function.
+        - Validates the provided data using the `validate_data` function.
         - Ensures the mandatory date column is provided in the data.
         - Dynamically constructs and executes an SQL INSERT query.
         - Logs a warning if the mandatory date column is missing.
@@ -259,7 +259,7 @@ class TGUserData(DBHandler):
 
         try:
             # Validate the data
-            valid_data = data_validation(self.column_names, self.date_column, self.date_format, data)
+            valid_data = validate_data(self.column_names, self.date_column, self.date_format, data)
 
             if valid_data:
                 # Construct the SQL INSERT query dynamically
@@ -321,7 +321,7 @@ class TGUserData(DBHandler):
         """
         try:
             # Validate the input fields
-            validated_data = data_validation(self.column_names, self.date_column, self.date_format, fields)
+            validated_data = validate_data(self.column_names, self.date_column, self.date_format, fields)
 
             # Construct the field assignment part of the SQL query dynamically
             fields_assignment = ', '.join([f"{key} = ?" for key in validated_data.keys()])
@@ -448,11 +448,11 @@ class TGUserData(DBHandler):
         default_reminders = []
         for i in self.default_notice:
             if row := self._get_upcoming_dates(notice_period_days=i, date=date):
-                default_reminders.extend(dict_from_row(row))
+                default_reminders.extend(rows_to_dict_list(row))
         return default_reminders
 
     def get_custom_reminders(self, date: datetime | None = None) -> list:
-        return dict_from_row(self._get_upcoming_dates_custom_column(date))
+        return rows_to_dict_list(self._get_upcoming_dates_custom_column(date))
 
     def get_all_reminders(self, date: datetime | None = None) -> dict:
         all_reminders = {}

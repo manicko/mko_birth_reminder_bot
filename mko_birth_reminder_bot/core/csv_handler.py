@@ -4,7 +4,7 @@ from typing import List, Optional
 import pandas as pd
 from datetime import datetime, timedelta
 from .errors import *
-from .utils import get_date, get_text, get_dir_content
+from .utils import parse_date, clean_text, list_files_in_directory
 from .config import CONFIG
 
 logger = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ class CSVHandler:
             return pd.DataFrame()
         valid_rows = []
         for _, row in dataframe.iterrows():
-            res = get_date(row[date_column])
+            res = parse_date(row[date_column])
             if res is None:
                 self.logger.warning(f"Invalid date format: {row[date_column]}. Row skipped.")
             else:
@@ -131,7 +131,7 @@ class CSVHandler:
 
         for col in column_names:
             if col != date_column:
-                dataframe[col] = dataframe[col].astype(str).apply(get_text)
+                dataframe[col] = dataframe[col].astype(str).apply(clean_text)
         return dataframe
 
     def remove_index_column_if_present(self, dataframe: pd.DataFrame) -> pd.DataFrame:
@@ -197,7 +197,7 @@ class CSVHandler:
         """
         if self.delete_files_after:
             cutoff_date = datetime.now() - timedelta(days=self.delete_files_after)
-            for file in get_dir_content(self.import_path, ext):
+            for file in list_files_in_directory(self.import_path, ext):
                 if datetime.fromtimestamp(file.stat().st_mtime) < cutoff_date:
                     self.safe_file_delete(file)
 

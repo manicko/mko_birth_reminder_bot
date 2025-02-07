@@ -3,7 +3,7 @@ import pytest
 import sqlite3
 from mko_birth_reminder_bot.core import TGUsers
 from tests.conftest import get_csv, get_test_data, csv_handler
-from mko_birth_reminder_bot.core.utils import (dict_from_row)
+from mko_birth_reminder_bot.core.utils import (rows_to_dict_list)
 from .test_data import TestData
 import mko_birth_reminder_bot.core.errors as errors
 from pathlib import Path
@@ -224,13 +224,13 @@ class TestTGUser:
         test = []
         for i in [0, 1, 3, 7]:
             if x := user_data._get_upcoming_dates(i):
-                test.append(dict_from_row(x))
+                test.append(rows_to_dict_list(x))
         print(test)
         assert len(test) == 4, f'Not all records got from test_data{test}'
 
     @freeze_time("2025-12-20 12:00:00")
     def test_custom_reminders(self, user_data):
-        data = dict_from_row(user_data._get_upcoming_dates_custom_column())
+        data = rows_to_dict_list(user_data._get_upcoming_dates_custom_column())
         assert len(data) == 6
 
     def test_del_info(self, random_user):

@@ -2,6 +2,8 @@ import yaml
 import logging
 from pathlib import Path
 from typing import Any, Dict, Union
+from mko_birth_reminder_bot.core.utils import list_files_in_directory
+from functools import reduce
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +16,7 @@ def load_config(path: Path) -> Dict[str, Any]:
         path (Path): Path to the YAML configuration file.
 
     Returns:
-        dict[str, Any]: Parsed configuration dictionary.
+        Dict[str, Any]: Parsed configuration dictionary, or an empty dict if the file does not exist or is invalid.
     """
     if path.exists():
         with path.open("r", encoding="utf-8") as f:
@@ -22,29 +24,30 @@ def load_config(path: Path) -> Dict[str, Any]:
     return {}
 
 
-def save_config(file_from: Path, file_to: Path) -> None:
+def save_config(source: Path, destination: Path) -> None:
     """
-    Saves user configuration from one file to another.
+    Saves configuration from one YAML file to another.
 
     Args:
-        file_from (Path): Source file path.
-        file_to (Path): Destination file path.
+        source (Path): Source YAML file path.
+        destination (Path): Destination YAML file path.
+
+    Raises:
+        OSError: If an error occurs while reading or writing the file.
     """
     try:
-        file_from = Path(file_from)
-        file_to = Path(file_to)
+        source = Path(source)
+        destination = Path(destination)
 
-        # Ensure the parent directory exists
-        if not file_to.exists():
-            parent_dir = file_to.parent.absolute()
-            parent_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure the destination directory exists
+        destination.parent.mkdir(parents=True, exist_ok=True)
 
-        data = load_config(file_from)
+        data = load_config(source)
 
-        with open(file_to, "w", encoding="utf-8") as f:
+        with destination.open("w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, allow_unicode=True, default_flow_style=False)
-    except Exception as e:
-        logger.error(e)
+    except OSError as e:
+        logger.error(f"Failed to save config from {source} to {destination}: {e}")
 
 
 def merge_dicts(dict1: Dict[Any, Any], dict2: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -68,9 +71,9 @@ def merge_dicts(dict1: Dict[Any, Any], dict2: Dict[Any, Any]) -> Dict[Any, Any]:
     return dict1
 
 
-def make_path(path: Path) -> None:
+def ensure_path_exists(path: Path) -> None:
     """
-    Checks if a path exists and creates it if necessary.
+    Ensures that a given path exists, creating directories if necessary.
 
     Args:
         path (Path): Path to a file or directory.
@@ -79,14 +82,14 @@ def make_path(path: Path) -> None:
         ValueError: If the path cannot be created.
     """
     try:
-        if path.exists():  # If the path already exists, do nothing
+        if path.exists():  # Path already exists
             return
-        if path.suffix:  # If the path points to a file
+        if path.suffix:  # If it's a file, create its parent directory
             path.parent.mkdir(parents=True, exist_ok=True)
-        else:  # If the path points to a directory
+        else:  # If it's a directory, create it
             path.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        raise ValueError(f"Failed to create path: {path} ({e})")
+    except OSError as e:
+        raise ValueError(f"Failed to create path {path}: {e}")
 
 
 def resolve_path(path: Union[str, Path], base_dir: Union[Path, None] = None) -> Path:
@@ -106,11 +109,10 @@ def resolve_path(path: Union[str, Path], base_dir: Union[Path, None] = None) -> 
     """
     path = Path(path).expanduser()  # Expands `~` (home directory)
 
-    # If the path is absolute and exists, return it immediately
     if path.is_absolute():
         if path.exists():
             return path
-        make_path(path)  # If not found, attempt to create it
+        ensure_path_exists(path)  # Create if it doesn't exist
         return path
 
     # If base_dir is not provided, use the parent directory of this module
@@ -121,6 +123,51 @@ def resolve_path(path: Union[str, Path], base_dir: Union[Path, None] = None) -> 
     resolved_path = (base_dir / path).resolve()
 
     if not resolved_path.exists():
-        make_path(resolved_path)  # Create the path if it does not exist
+        ensure_path_exists(resolved_path)  # Create the path if it does not exist
 
     return resolved_path
+
+
+def read_file(filepath: str | Path) -> str:
+    """
+    Reads a file and prepares its content for sending.
+
+    The function opens the file using UTF-8 encoding and reads its content.
+
+    Args:
+        filepath (str): The path to the Markdown file.
+
+    Returns:
+        str: The formatted Markdown text.
+
+    Raises:
+        Exception: If an error occurs while reading the file.
+    """
+    text = ''
+    try:
+        with open(filepath, encoding="utf-8") as file:
+            text = file.read()
+    except Exception as e:
+        logger.error(f"Error reading file '{filepath}': {e}")
+    return text
+
+def get_messages(*paths_to_md: Union[str, Path]) -> Dict[str, str]:
+    """
+    Retrieves Markdown messages from multiple directories.
+
+    Args:
+        paths_to_md (Union[str, Path]): One or more directory paths containing Markdown files.
+
+    Returns:
+        Dict[str, str]: A dictionary where keys are file names (without extensions) and values are file contents.
+    """
+    list_of_files = []
+    for path in paths_to_md:
+        files = list_files_in_directory(path, ('md',))
+        list_of_files.append({f.stem: f for f in files})
+
+    # Merge dictionaries to avoid duplicate keys
+    messages = reduce(merge_dicts, list_of_files, {})
+
+    # Read file contents into dictionary
+    return {name: read_file(file) for name, file in messages.items()}

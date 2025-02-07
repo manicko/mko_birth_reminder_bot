@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings
 from platformdirs import user_config_dir
 
 from mko_birth_reminder_bot.core.config_utils import (
-    load_config, resolve_path, merge_dicts
+    load_config, resolve_path, merge_dicts,get_messages
 )
 
 
@@ -19,6 +19,9 @@ class WorkingPaths(BaseSettings):
 
     default_settings: Path = Path.joinpath(root_dir, 'settings')
     user_settings: Path = Path.joinpath(user_folder, 'settings')
+
+    default_messages: Path = Path.joinpath(root_dir, 'messages')
+    user_messages: Path = Path.joinpath(user_folder, 'messages')
 
     config_files: dict[str, str] = {
         "config": "config.yaml",
@@ -35,6 +38,9 @@ class WorkingPaths(BaseSettings):
 
 PATHS = WorkingPaths()
 
+class Messages(BaseModel):
+    help:str = ''
+    help_import:str = ''
 
 # Database settings
 class DatabaseSettings(BaseModel):
@@ -156,6 +162,7 @@ class Config(BaseSettings):
     TELETHON_API: TelethonApiSettings
     REMINDER: ReminderSettings
     LOGGING: LoggingSettings
+    MSG: Messages
 
     model_config = {
         "env_prefix": "APP_",
@@ -175,8 +182,10 @@ class Config(BaseSettings):
                 data = load_config(path)  # Load YAML
                 merge_dicts(merged_config, data)  # Merge configs
 
+        merged_config['MSG'] = get_messages(
+            PATHS.default_messages,
+            PATHS.user_messages)
         return cls.model_validate(merged_config)
-
 
 # Load the final configuration
 CONFIG = Config.load()

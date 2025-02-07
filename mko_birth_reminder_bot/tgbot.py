@@ -50,54 +50,6 @@ async def save_csv_file(event, user_id: int, upload_dir: str = CONFIG.CSV.READ_D
         return "Error: Please upload a CSV file."
 
 
-def get_csv_prompt(columns: dict = CONFIG.DATABASE.columns,
-                   sep: str = CONFIG.CSV.READ_DATA.from_csv["sep"],
-                   enc: str = CONFIG.CSV.READ_DATA.from_csv["encoding"]):
-    """
-    Generates a prompt with instructions for uploading a CSV file.
-
-    Args:
-        columns (dict, optional): Database column configuration.
-        sep (str, optional): CSV separator character.
-        enc (str, optional): File encoding format.
-
-    Returns:
-        str: Formatted instruction text for uploading a CSV file.
-    """
-
-    # example_data_ru = [["ОАО Зета", "Соколова", "Анна", "Кадры", "1-я категория", "1995-04-18", 7],
-    #                    ["ПАО Эта", "Козлов", "Иван", "Генеральный директор", "VIP", "1978-09-23", 30]]
-    example_data = [["Company A", "Smith", "John", "HR", "Manager", "1995-04-18", 7],
-                    ["Company B", "Doe", "Jane", "CEO", "VIP", "1980-09-15", 30]]
-
-    column_names = [col_name for col_name, col_type in columns.items() if 'PRIMARY' not in col_type]
-    csv_example = [column_names] + example_data
-    csv_example_str = '\n'.join([sep.join(map(str, row)) for row in csv_example])
-    prompt = (f"📄 **Upload a CSV file with birthday data, following these requirements:**"
-              f"\n        - File encoding must be `'{enc.upper()}'`"
-              f"\n        - Keep the number and order of fields strictly"
-              f"\n        - Use `'{sep}'` as a field separator"
-              f"\n        - Date format must be `'dd/mm/yyyy'` or `'dd.mm.yyyy'`"
-              f"\n\n❗ **If you are using a previously exported file:**"
-              f"\n        - Remove the `id` column"
-              f"\n        - Clear records before importing to avoid duplicates"
-              f"\n\n💡 **Example of correct formatting:**"
-              f"```{csv_example_str}```")
-
-    # prompt_ru = (f"📄 **Отправьте CSV файл с данными дней рождений, соблюдая требования:**"
-    #              f"\n        - файл должен быть в кодировке `'{enc.upper()}'`"
-    #              f"\n        - строго соблюдайте количество и порядок полей"
-    #              f"\n        - в качестве разделителя полей используйте `'{sep}'`"
-    #              f"\n        - формат даты должен быть `'dd/mm/yyyy'` или `'dd.mm.yyyy'`"
-    #              f"\n\n❗️ **Если для загрузки вы используете ранее выгруженный файл:**"
-    #              f"\n        - удалите столбец `id`\n"
-    #              f"\n        - очистите записи перед загрузкой, чтобы они не дублировались"
-    #              f"\n\n💡 **Вот пример корректного заполнения:**"
-    #              f"```{csv_example_str}```")
-
-    return prompt
-
-
 # General functions
 def make_menu(name, config) -> list[list[Button]] | None:
     """
@@ -326,6 +278,11 @@ async def start(event):
     await init_user(user_id)
     await show_start_menu(event, user_id)
 
+@client.on(events.NewMessage(pattern="/help"))
+async def help_command(event):
+    """Handles the /help command and sends the help message."""
+    await event.respond(CONFIG.MSG.help)
+
 
 # noinspection PyTypeChecker
 @client.on(events.CallbackQuery)
@@ -394,7 +351,7 @@ async def handle_callback(event):
                 event,
                 user_id,
                 'import_csv',
-                get_csv_prompt()
+                CONFIG.MSG.help_import
             )
 
         case "export_csv":
