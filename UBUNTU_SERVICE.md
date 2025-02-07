@@ -5,7 +5,6 @@ from your virtual environment rather than the system-wide Python.
 This way, you don't need to run a separate command to activate 
 the virtual environment before starting the bot.
 
--
 ## Steps to Apply the Service File
 
 1. **Copy the service file: [mko_birth_reminder_bot.service](mko_birth_reminder_bot.service).
@@ -14,10 +13,8 @@ to the correct location:**
    ```bash
    sudo cp mko_birth_reminder_bot.service /etc/systemd/system/
    ```
-
 2. **Make sure to update the fields in the file:**
 `WorkingDirectory`, `User`, and `Group`
-
 
 3. **Reload the systemd daemon:**
 
@@ -31,13 +28,13 @@ to the correct location:**
    sudo systemctl enable mko_birth_reminder_bot.service
    ```
 
-4. **Start the service:**
+5. **Start the service:**
 
    ```bash
    sudo systemctl start mko_birth_reminder_bot.service
    ```
 
-5. **Check the service status:**
+6. **Check the service status:**
 
    ```bash
    sudo systemctl status mko_birth_reminder_bot.service
