@@ -1,13 +1,27 @@
 # Systemd 'unit' file.
-# Copy (or link) them to /usr/lib/systemd/system or etc/systemd/system
-# sudo touch /etc/systemd/system/mko_birth_reminder_bot.service
-# sudo nano /etc/systemd/system/mko_birth_reminder_bot.service
-# sudo systemctl daemon-reload
-# sudo systemctl enable mko_birth_reminder_bot.service
-# sudo systemctl start mko_birth_reminder_bot.service
 
-# check status
-# sudo systemctl status mko_birth_reminder_bot
+
+#Steps to Apply the Service File
+# Copy (or link) them to /usr/lib/systemd/system or etc/systemd/system
+#sudo cp mko_birth_reminder_bot.service /etc/systemd/system/
+# or
+# sudo touch /etc/systemd/system/mko_birth_reminder_bot.service
+
+# Make sure to update the WorkingDirectory, User, and Group fields
+# with your actual project path and user/group names.
+# sudo nano /etc/systemd/system/mko_birth_reminder_bot.service
+
+#Reload the systemd daemon:
+#sudo systemctl daemon-reload
+
+#Enable the service to start at boot:
+#sudo systemctl enable mko_birth_reminder_bot.service
+
+#Start the service:
+#sudo systemctl start mko_birth_reminder_bot.service
+
+#Check the service status:
+#sudo systemctl status mko_birth_reminder_bot.service
 
 # stop / restart
 # sudo systemctl stop mko_birth_reminder_bot
@@ -18,8 +32,9 @@ Description=MKOBirthReminder Telegram Bot
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 -m mko_birth_reminder_bot.main run-bot
-WorkingDirectory=/path/to/your/project
+# Use the Python interpreter from your virtual environment to ensure the venv is used.
+ExecStart=/home/myUser/venvs/myenv/bin/python3 -m mko_birth_reminder_bot.main run-bot
+WorkingDirectory=/home/myUser/path/to/your/project
 Restart=always
 RestartSec=5s
 User=youruser

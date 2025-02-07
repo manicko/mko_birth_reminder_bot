@@ -5,7 +5,6 @@ import signal
 from mko_birth_reminder_bot.core.config import PATHS
 from mko_birth_reminder_bot.core.config_utils import save_config
 from mko_birth_reminder_bot.core import DBHandler, TGUsers
-from mko_birth_reminder_bot.tgbot import run_tg_bot, stop_tg_bot
 
 # Logging setup
 logger = logging.getLogger(__name__)
@@ -89,28 +88,34 @@ def run_bot() -> None:
     Raises:
         Exception: If an error occurs while launching the bot.
     """
+
     try:
+        from mko_birth_reminder_bot.tgbot import run_tg_bot
         click.echo("Launching the bot... Press Ctrl+C to stop.")
         click.echo("To verify, contact the bot via Telegram using its username (starting with '@') "
-        "and send the '/start' command.")
+                   "and send the '/start' command.")
         asyncio.run(run_tg_bot())  # Безопасный запуск и завершение event loop
 
     except KeyboardInterrupt:
+        from mko_birth_reminder_bot.tgbot import stop_tg_bot
         click.echo("Stopping the bot...")
         asyncio.run(stop_tg_bot())  # Корректное завершение
     except Exception as e:
         click.echo(f"Error launching the bot: {e}", err=True)
 
 
-
-
 def handle_signal(signal_number, frame):
     """
     Handles SIGINT (Ctrl+C) and SIGTERM (kill).
     """
-    click.echo(f"Received signal {signal_number}. Stopping the bot...")
-    logger.info(f"Received signal {signal_number}. Stopping the bot...")
-    asyncio.create_task(stop_tg_bot())  # Stops the bot asynchronously
+    try:
+        from mko_birth_reminder_bot.tgbot import stop_tg_bot
+        click.echo(f"Received signal {signal_number}. Stopping the bot...")
+        logger.info(f"Received signal {signal_number}. Stopping the bot...")
+        asyncio.create_task(stop_tg_bot())  # Stops the bot asynchronously
+    except Exception as e:
+        click.echo(f"Error stopping the bot: {e}", err=True)
+
 
 # Register signal handlers **before** running CLI
 signal.signal(signal.SIGINT, handle_signal)  # Ctrl+C

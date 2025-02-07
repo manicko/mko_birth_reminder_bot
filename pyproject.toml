@@ -4,7 +4,7 @@ requires = ["setuptools>=61.0", "wheel>=0.37.1"]
 
 [project]
 name = "mko_birth_reminder_bot"
-version = "0.0.1"
+version = "0.0.3"
 authors = [
     { name = "mko", email = "manicko@yandex.ru" },
 ]
@@ -13,23 +13,19 @@ description = "Telegram birth reminder bot built on Telethon."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "aiohttp>=3.11.11",
-    "beautifulsoup4>=4.13.0",
-    "click>=8.1.8",
-    "pandas>=2.2.3",
-    "platformdirs>=4.3.6",
-    "prettytable>=3.14.0",
-    "pydantic>=2.10.6",
-    "pydantic-settings>=2.7.1",
-    "python-dateutil>=2.9.0.post0",
+    "aiohttp>=3.10",
+    "beautifulsoup4>=4.11",
+    "click>=8",
+    "pandas>=2.2",
+    "platformdirs>=4",
+    "prettytable>=3",
+    "pydantic>=2",
+    "pydantic-settings>=2",
+    "python-dateutil>=2",
     "pytz>=2025.1",
-    "PyYAML>=6.0.2",
-    "Telethon>=1.38.1",
-    "APScheduler>=3.11.0",
-    "pytest>=8.3.4",
-    "Faker>=35.2.0",
-    "freezegun>=1.5.1",
-    "pytest-asyncio>=0.25.3",
+    "PyYAML>=6",
+    "Telethon>=1",
+    "APScheduler>=3"
 ]
 
 classifiers = [

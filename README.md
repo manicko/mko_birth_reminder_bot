@@ -22,17 +22,18 @@ Telegram bot that sends notifications about upcoming birthdays.
   ```bash
   pip install -r requirements.txt
   ```
+- To configure Ubuntu, please [read](README_UBUNTU.md).
 
 ### **2️⃣ Initialize the Database**
 - Run the following command to set up the SQLite database:
   ```bash
-  python mko_birth_reminder_bot/main.py init-db
+  python3 -m mko_birth_reminder_bot.main init-db
   ```
 
 ### **3️⃣ Export Default Configuration**
 - Export the default configuration files to your home directory:
   ```bash
-  python mko_birth_reminder_bot/main.py export-config
+  python3 -m mko_birth_reminder_bot.main export-config
   ```
   ⚠ **Important:** Save the location of the configuration files.
 
@@ -77,7 +78,7 @@ Telegram bot that sends notifications about upcoming birthdays.
 ### **6️⃣ Start the Bot**
 - Run the following command to launch the bot:
   ```bash
-  python mko_birth_reminder_bot/main.py run-bot
+  python3 -m mko_birth_reminder_bot.main run-bot
   ```
 
 - Contact the bot via Telegram using its username (starts with `@`) and send the `/start` command to open the menu.

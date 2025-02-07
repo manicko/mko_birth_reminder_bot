@@ -7,7 +7,14 @@ from mko_birth_reminder_bot.operator import Operator
 
 logger = logging.getLogger(__name__)
 
-client = TelegramClient(**CONFIG.TELETHON_API.client)
+client = None
+try:
+    client = TelegramClient(**CONFIG.TELETHON_API.client)
+except ValueError as error:
+    logger.error(f"Error while connecting to Telegram: {error}. "
+                 f"Please ensure the secrets config is filed in and correct.")
+
+
 user_data = {}  # Dictionary for temporary user data storage
 running = True  # Flag to track bot status
 UNEXPECTED_ERROR_CAPTION = "Unexpected error. Repeat the attempt by entering the /start command."
