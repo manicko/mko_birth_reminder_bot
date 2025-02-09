@@ -24,7 +24,7 @@ def db_connect() -> sqlite3.Connection:
         db_con.row_factory = sqlite3.Row
 
         # Allows using the connection in multiple threads
-        db_con.execute("PRAGMA journal_mode=WAL;")  # Improves multi-threaded access
+        db_con.execute("PRAGMA journal_mode=WAL;")  # Improves multithreaded access
         db_con.execute("PRAGMA synchronous=NORMAL;")
         db_con.execute("PRAGMA foreign_keys=ON;")
         logging.info("Database initialized.")

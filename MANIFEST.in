@@ -2,6 +2,7 @@ include README.md
 include LICENSE.txt
 include requirements.txt
 include tests
+include mko_birth_reminder_bot/messages/*
 recursive-include mko_birth_reminder_bot *.json *.yaml
 exclude *.git
 global-exclude tests/.pytest_cache/*
