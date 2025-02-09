@@ -24,7 +24,7 @@ Telegram bot that sends notifications about upcoming birthdays.
   ```
 - Alternatively you can install the package with all dependencies from [test.pypi.org](https://test.pypi.org/project/mko-birth-reminder-bot/)
 ```bash
-    pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple mko-birth-reminder-bot
+    pip install --upgrade --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple mko-birth-reminder-bot
 ```
 - To configure Ubuntu, please [read](README_UBUNTU.md).
 
