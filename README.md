@@ -15,13 +15,17 @@ Telegram bot that sends notifications about upcoming birthdays.
 
 ## ⚙️ Setup
 
-### **1️⃣ Install Dependencies**
+### **1️⃣ Install the package and dependencies**
 - Download the package.
 - Set up a virtual environment (Python 3.12 is required).
 - Install all required dependencies:
   ```bash
   pip install -r requirements.txt
   ```
+- Alternatively you can install the package with all dependencies from [test.pypi.org](https://test.pypi.org/project/mko-birth-reminder-bot/)
+```bash
+    pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple mko-birth-reminder-bot
+```
 - To configure Ubuntu, please [read](README_UBUNTU.md).
 
 ### **2️⃣ Initialize the Database**
