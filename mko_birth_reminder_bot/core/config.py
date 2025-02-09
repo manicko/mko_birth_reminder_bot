@@ -189,3 +189,4 @@ class Config(BaseSettings):
 
 # Load the final configuration
 CONFIG = Config.load()
+

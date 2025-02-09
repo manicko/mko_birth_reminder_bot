@@ -68,8 +68,8 @@
   "REMINDER": {
     "timezone": "Europe/Moscow",
     "trigger": {
-      "hour": 15,
-      "minute": 30
+      "hour": 12,
+      "minute": 00
     },
     "state_file": "reminder_state.yaml",
     "columns_to_send": [
