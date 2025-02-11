@@ -8,6 +8,8 @@ from mko_birth_reminder_bot.operator import Operator
 logger = logging.getLogger(__name__)
 
 client = None
+bot = None
+bot_id = 0
 try:
     client = TelegramClient(**CONFIG.TELETHON_API.client)
 except ValueError as error:
@@ -109,30 +111,76 @@ def get_prompt_from_config(choice, menu):
     return None
 
 
-async def handle_edit_respond(event, text, buttons=None, rewrite=True):
+# async def handle_edit_respond(event, text, buttons=None, rewrite=True):
+#     """
+#     Sends or edits a message dynamically.
+#
+#     If `rewrite` is True and the original message was sent by the bot, it attempts to edit it.
+#     Otherwise, a new message is sent.
+#
+#     Args:
+#         event (telethon.events.NewMessage.Event or telethon.events.CallbackQuery.Event or telethon.tl.custom.message.Message):
+#             The event triggering the response or a sent message object.
+#         text (str): The message text.
+#         buttons (list[list[Button]], optional): Inline buttons for the message. Defaults to None.
+#         rewrite (bool, optional): If True, attempts to edit the existing message. Defaults to True.
+#
+#     Returns:
+#         telethon.tl.custom.message.Message: The sent or edited message object.
+#     """
+#
+#     if rewrite:
+#         try:
+#             await event.edit(text, buttons=buttons)
+#             return event
+#         except Exception as e:
+#             logger.error(f"Failed to edit message: {e}")
+#     return await event.respond(text, buttons=buttons)
+#
+
+
+async def get_event_message(event):
+    """
+    Safely retrieves the message associated with the event.
+
+    Args:
+        event (telethon.events.CallbackQuery.Event or telethon.events.NewMessage.Event):
+            The event triggering the response.
+
+    Returns:
+        telethon.tl.custom.message.Message or None: The retrieved message or None if not found.
+    """
+    if isinstance(event, events.CallbackQuery.Event):
+        return await event.get_message()  # Fetch message from server if necessary
+    return getattr(event, "message", None)
+
+
+async def handle_edit_respond(event, text=None, buttons=None, rewrite=True):
     """
     Sends or edits a message dynamically.
 
     If `rewrite` is True and the original message was sent by the bot, it attempts to edit it.
-    Otherwise, a new message is sent.
+    If editing fails or `remove_old_buttons` is True, sends a new message.
 
     Args:
-        event (telethon.events.NewMessage.Event or telethon.events.CallbackQuery.Event or telethon.tl.custom.message.Message):
-            The event triggering the response or a sent message object.
-        text (str): The message text.
+        event (telethon.events.NewMessage.Event or telethon.events.CallbackQuery.Event):
+            The event triggering the response.
+        text (str, optional): The message text. Defaults to None.
         buttons (list[list[Button]], optional): Inline buttons for the message. Defaults to None.
         rewrite (bool, optional): If True, attempts to edit the existing message. Defaults to True.
 
     Returns:
         telethon.tl.custom.message.Message: The sent or edited message object.
     """
+      # Get bot information once per function call
+    message = await get_event_message(event)  # Safe message retrieval
 
-    if rewrite:
+    if rewrite and message and message.sender_id == bot_id:
         try:
-            await event.edit(text, buttons=buttons)
-            return event
+            return await message.edit(text=text, buttons=buttons)
         except Exception as e:
-            logger.error(f"Failed to edit message: {e}")
+            logger.warning(f"Editing failed, sending new message: {e}")
+
     return await event.respond(text, buttons=buttons)
 
 
@@ -502,10 +550,10 @@ async def run_tg_bot():
     It also starts the scheduled tasks associated with the bot. The function keeps running
     until the global `running` flag is set to False.
     """
-    global running
-
+    global running, bot, bot_id
     await client.start(bot_token=CONFIG.TELETHON_API.bot_token)
-
+    bot = await client.get_me()
+    bot_id = bot.id
     logger.info("Telegram bot is running.")
     # Start scheduler
     await start_scheduler(client)
