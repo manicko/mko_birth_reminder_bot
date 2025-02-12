@@ -26,7 +26,7 @@
       'from_csv': {
         'sep': ';',
         'on_bad_lines': 'skip',
-        'encoding': 'utf-8',
+        'encoding': 'utf-8-sig',
         'index_col': False,
         'skiprows': Null,
         'header': 0  # ignor column names in CSV file
@@ -36,7 +36,7 @@
         "path": "tmp",
         'to_csv': { # general settings for pandas CSV reader
           'sep': ';',
-          'encoding': 'utf-8',
+          'encoding': 'utf-8-sig',
           #          'mode': 'a',
           'header': True,
           'index': False,
