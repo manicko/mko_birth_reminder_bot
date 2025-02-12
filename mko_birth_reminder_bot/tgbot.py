@@ -512,6 +512,19 @@ async def handle_start_menu_callback(event):
             logger.error(f"Unexpected callback: {callback}")
     raise StopPropagation
 
+@client.on(events.CallbackQuery(data=b"back_to_start"))
+async def handle_confirm_data_callback(event):
+    """
+    Handles back_to_start button clicks in the Telegram bot menu, returns to start menu.
+    Args:
+        event (telethon.events.CallbackQuery.Event): The event triggered by a button press.
+
+    Returns:
+        None
+    """
+    user_id = event.sender_id
+    await show_start_menu(event, user_id)
+    raise StopPropagation
 
 @client.on(events.CallbackQuery(data=b"confirm_data"))
 async def handle_confirm_data_callback(event):
