@@ -129,8 +129,7 @@ class TestTGUser:
             user_data.add_record(**data)
             assert user_data.get_record_by_id("SELECT") is None
             assert user_data.get_record_by_id(2) is None
-            assert len(user_data.get_record_by_id(1)) == len(
-                user_data.column_names)  # 8 столбцов в таблице с данными
+            assert len(user_data.get_record_by_id(1)) == len(user_data.column_names)  # 8 столбцов в таблице с данными
             user_data.flush_data()
         except Exception as e:
             pytest.fail(f"Fail get_record: {e}")

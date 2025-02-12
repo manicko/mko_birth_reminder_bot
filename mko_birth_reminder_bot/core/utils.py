@@ -133,7 +133,7 @@ def parse_date(date_str: str, date_patterns: Tuple[str, ...] = DATE_PATTERNS) ->
             continue
     return None
 
-def clean_text(text: str) -> str:
+def clean_text(text: str|int) -> str|int:
     """
     Cleans text by removing unwanted characters and extra spaces.
 
@@ -143,8 +143,11 @@ def clean_text(text: str) -> str:
     Returns:
         str: The cleaned text.
     """
+    text = str(text).strip()
+    if text.isdigit():
+        return int(text)
     pattern = r'[^а-яА-Яa-zA-Z0-9\s\-–]'
-    return re.sub(pattern, '', text).strip()
+    return re.sub(pattern, '',text)
 
 
 def safe_substitute(template: str, mapping: Dict[str, str]) -> str:

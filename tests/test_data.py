@@ -66,7 +66,7 @@ class TestData:
 
     invalid_data_wrong_col_num = [
         # 2. Количество столбцов больше необходимого
-        ("Beta Inc", "Doe", "Jane", "Developer", "Tech", "1990-03-22", 14, "ExtraColumn"),
+        ("Beta Inc", "Doe", "Jane", "Developer", "Tech", "1990-03-22", 14, "ExtraColumn","ExtraColumn"),
         # 2. Количество столбцов меньше необходимого
         ("Gamma LLC", "Brown", "Charlie", "Books", "1988-11-05"),  # Поле notice_before отсутствует
     ]

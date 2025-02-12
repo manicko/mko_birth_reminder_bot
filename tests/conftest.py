@@ -116,6 +116,6 @@ def cleanup_temp_files(config):
         target_output.unlink()
 
 @pytest_asyncio.fixture(loop_scope="module")
-def quote_fetcher():
-    with QuoteFetcher() as f:
+async def quote_fetcher():
+    async with QuoteFetcher() as f:
         yield f

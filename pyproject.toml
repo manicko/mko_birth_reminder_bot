@@ -62,4 +62,4 @@ addopts = "-ra -q"
 # It suppresses most of the output, making the test run less verbose.
 
 console_output_style = "classic"
-testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "module"

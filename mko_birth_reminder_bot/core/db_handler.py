@@ -146,7 +146,8 @@ class DBHandler:
         """
         Closes the connection when exiting the context.
         """
-        self.close()
+        # self.close()
+        pass
 
 
 class TGUserData(DBHandler):
@@ -212,7 +213,7 @@ class TGUserData(DBHandler):
             int: Number of records added.
         """
         if sql_loader_settings is None:
-            sql_loader_settings = DBHandler.DATA_TO_SQL_PARAMS
+            sql_loader_settings = self.DATA_TO_SQL_PARAMS
         prepared_data.to_sql(
             **sql_loader_settings,
             name=self._data_tbl_name,
@@ -480,7 +481,7 @@ class TGUsers(DBHandler):
         """
         Получает все id из таблицы пользователей.
         """
-        query = f"""SELECT {self._id_column} FROM {TGUsers.TABLE_NAME}"""
+        query = f"""SELECT {self._id_column} FROM {self.TABLE_NAME}"""
         return self.perform_query(query, fetch='all', raise_exceptions=False)
 
     def iter_ids(self):
