@@ -109,7 +109,7 @@ class TelethonApiSettings(BaseModel):
     menu: dict[str, list[list[dict[str, str]]]]
     bot_token: str
     client: dict[str, Any]
-
+    throttle_limits: dict[str, list[int]]
 
 # Reminder settings
 class ReminderSettings(BaseModel):

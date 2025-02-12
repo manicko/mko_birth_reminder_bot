@@ -1,15 +1,24 @@
 import logging
 import asyncio
+from collections import defaultdict
+from time import time
 from telethon import TelegramClient, events, Button
+from telethon.events import StopPropagation
 from mko_birth_reminder_bot.reminder import start_scheduler, check_missed_run
 from mko_birth_reminder_bot.core import CONFIG, DB_CONNECTION
 from mko_birth_reminder_bot.operator import Operator
 
 logger = logging.getLogger(__name__)
 
+
 client = None
 bot = None
 bot_id = 0
+user_data = {}  # Dictionary for temporary user data storage
+user_request_times = defaultdict(list)  # {user_id: [timestamps]}
+running = True  # Flag to track bot status
+UNEXPECTED_ERROR_CAPTION = "Unexpected error. Repeat the attempt by entering the /start command."
+
 try:
     client = TelegramClient(**CONFIG.TELETHON_API.client)
 except ValueError as error:
@@ -17,9 +26,82 @@ except ValueError as error:
                  f"Please ensure the secrets config is filed in and correct.")
 
 
-user_data = {}  # Dictionary for temporary user data storage
-running = True  # Flag to track bot status
-UNEXPECTED_ERROR_CAPTION = "Unexpected error. Repeat the attempt by entering the /start command."
+def get_menu_buttons_list(name:str, config:dict[str:str]) -> list[str]:
+    """ Generates Telethon menu buttons list from configuration."""
+    level = config.get(name, [])
+    return [button for row in level for item in row for button in item.keys()]
+
+
+def pattern_from_list(buttons:list[str]) -> str:
+    """Creates pattern for the Telethon client.on() events filters, from the list of commands"""
+    return f"^({'|'.join(buttons)})$"
+
+
+def get_menu_pattern(name, config=CONFIG.TELETHON_API.menu) -> str:
+    """Creates pattern for the Telethon client.on() events filters, from the config basing on the name of the menu"""
+    buttons = get_menu_buttons_list(name, config)
+    return pattern_from_list(buttons)
+
+
+async def handle_waited_param(event, user_id):
+    """Handles user input when adding, updating a new record."""
+    waited_param_name = user_data[user_id].pop("waited_param_name", None)
+    if waited_param_name:
+        user_data[user_id]["params"][waited_param_name] = event.raw_text
+        await show_record_menu(event, user_id)
+
+
+async def handle_confirm_data(event, user_id):
+    """Handles data confirmation."""
+    is_valid = await validate_record(event, user_id)
+    if not is_valid:
+        return
+    operator: Operator = Operator(user_id)
+    state = user_data[user_id].get("state")
+    try:
+        if state == "add_record":
+            caption = await asyncio.to_thread(operator.add_record, **user_data[user_id]["params"])
+        elif state == "update_record_by_id":
+            caption = await asyncio.to_thread(operator.update_record_by_id, **user_data[user_id]["params"])
+        else:
+            logger.error(f"Unexpected state: {state}")
+            caption = UNEXPECTED_ERROR_CAPTION
+    except Exception as e:
+        logger.error(f"Error in state: {state}, while processing record. {e}")
+        caption = UNEXPECTED_ERROR_CAPTION
+
+    await client.send_message(user_id, caption)
+    await show_start_menu(event, user_id, rewrite=False)
+
+
+async def handle_delete_record(event, user_id):
+    """Handles user input when deleting a record."""
+    record_id = event.raw_text.strip()
+
+    if not record_id.isdigit():
+        await event.respond("⚠️ Invalid ID format. Please enter a valid number.")
+        return
+
+    operator: Operator = Operator(user_id)
+    caption = await asyncio.to_thread(operator.delete_record_by_id, record_id)
+    await client.send_message(event.chat_id, caption)
+    await show_start_menu(event, user_id, rewrite=False)
+
+
+async def handle_import_csv(event, user_id):
+    """Handles CSV file import."""
+    response = await save_csv_file(event, user_id)
+    msg = await event.respond(response)
+
+    file = user_data[user_id]["params"].get("csv")
+    if not file:
+        await msg.respond("⚠️ No file found. Please upload a CSV file.")
+        return
+
+    operator: Operator = Operator(user_id)
+    text = await asyncio.to_thread(operator.import_data, file)
+    await msg.respond(text)
+    await show_start_menu(event, user_id, rewrite=False)
 
 
 async def save_csv_file(event, user_id: int, upload_dir: str = CONFIG.CSV.READ_DATA.path):
@@ -111,34 +193,6 @@ def get_prompt_from_config(choice, menu):
     return None
 
 
-# async def handle_edit_respond(event, text, buttons=None, rewrite=True):
-#     """
-#     Sends or edits a message dynamically.
-#
-#     If `rewrite` is True and the original message was sent by the bot, it attempts to edit it.
-#     Otherwise, a new message is sent.
-#
-#     Args:
-#         event (telethon.events.NewMessage.Event or telethon.events.CallbackQuery.Event or telethon.tl.custom.message.Message):
-#             The event triggering the response or a sent message object.
-#         text (str): The message text.
-#         buttons (list[list[Button]], optional): Inline buttons for the message. Defaults to None.
-#         rewrite (bool, optional): If True, attempts to edit the existing message. Defaults to True.
-#
-#     Returns:
-#         telethon.tl.custom.message.Message: The sent or edited message object.
-#     """
-#
-#     if rewrite:
-#         try:
-#             await event.edit(text, buttons=buttons)
-#             return event
-#         except Exception as e:
-#             logger.error(f"Failed to edit message: {e}")
-#     return await event.respond(text, buttons=buttons)
-#
-
-
 async def get_event_message(event):
     """
     Safely retrieves the message associated with the event.
@@ -172,7 +226,7 @@ async def handle_edit_respond(event, text=None, buttons=None, rewrite=True):
     Returns:
         telethon.tl.custom.message.Message: The sent or edited message object.
     """
-      # Get bot information once per function call
+    # Get bot information once per function call
     message = await get_event_message(event)  # Safe message retrieval
 
     if rewrite and message and message.sender_id == bot_id:
@@ -221,32 +275,6 @@ async def ask_for_input(event, user_id, param_name, prompt_text):
     await handle_edit_respond(event, prompt_text)
 
 
-
-# async def handle_data_entry(event, user_id: int):
-#     """
-#     Processes user input at level 3 of the menu.
-#
-#     Args:
-#         event (telethon.events.NewMessage.Event): The event containing user input.
-#         user_id (int): The Telegram user ID.
-#
-#     Returns:
-#         None
-#     """
-#     if user_id not in user_data:
-#         logger.error(f"User ID {user_id} not found while handling data entry.")
-#         return
-#
-#     param_name = user_data[user_id].get('waited_param_name')
-#     if param_name:
-#         user_data[user_id]['params'][param_name] = event.raw_text  # Save the entered data
-#         buttons = [
-#             [Button.inline("Accept", b"accept_input")],
-#             [Button.inline("Cancel", b"cancel_input")]
-#         ]
-#         await event.respond(f"You entered: {event.raw_text}. Confirm or cancel:", buttons=buttons)
-
-
 # Menu functions
 async def show_start_menu(event, user_id: int, rewrite: bool = True):
     """
@@ -268,7 +296,7 @@ async def show_start_menu(event, user_id: int, rewrite: bool = True):
         logger.error("Start menu not found in configuration.")
 
 
-async def show_add_record_menu(event, rewrite: bool = True):
+async def show_record_menu(event, rewrite: bool = True):
     """
     Displays the second-level menu for data entry.
 
@@ -308,239 +336,293 @@ async def validate_record(event, user_id) -> bool:
     """
     user_info = user_data[user_id].get('params', {})
 
-    if 'birth_date' in user_info or user_data[user_id]['state'] == 'update_record_by_id_state':
+    if 'birth_date' in user_info or user_data[user_id]['state'] == 'update_record_by_id':
         result = "\n".join(f"{key}: {value}" for key, value in user_info.items())
         await handle_edit_respond(event, text=f"Entered data:\n{result}", rewrite=True)
         return True
     else:
         prompt = f"You did not fill in the required field: {get_prompt_from_config('birth_date', CONFIG.TELETHON_API.menu)}"
         await handle_edit_respond(event, text=prompt, rewrite=True)
-        await show_add_record_menu(event, rewrite=False)
+        await show_record_menu(event, rewrite=False)
         return False
+
+
+async def is_throttled(user_id: int, command: str) -> bool:
+    """Checks if the user is sending too many requests and applies rate limiting.
+
+    Args:
+        user_id (int): Telegram user ID.
+        command (str): The command or event name (e.g. "/start", "callback").
+
+    Returns:
+        bool: True if throttled, False otherwise.
+    """
+    now = time()
+
+    max_requests, period = CONFIG.TELETHON_API.throttle_limits.get(command, (5, 10))  # Default: 5 in 10 sec
+    request_times = user_request_times[user_id]
+
+    # Remove outdated requests
+    user_request_times[user_id] = [t for t in request_times if now - t < period]
+
+    if len(user_request_times[user_id]) >= max_requests:
+        return True
+
+    user_request_times[user_id].append(now)
+    return False
+
+
+async def request_id(event, user_id):
+    """ Helper function to request ID of the record to be deleted or modified"""
+    await ask_for_input(
+        event,
+        user_id,
+        param_name='record_id',
+        prompt_text="Enter the ID of the record."
+    )
+
+
+async def request_csv(event, user_id):
+    """ Helper function to request import of the CSV file with records."""
+    await ask_for_input(
+        event,
+        user_id,
+        param_name='import_csv',
+        prompt_text=CONFIG.MSG.help_import
+    )
+
+
+async def handle_export_csv(event, user_id):
+    """Handles CSV export."""
+    operator: Operator = Operator(user_id)
+    file = await asyncio.to_thread(operator.export_data)
+    if file:
+        await client.send_file(event.chat_id, file, caption="Here is your data file in CSV format.")
+        await asyncio.to_thread(operator.remove_tmp_file, file)
+    else:
+        await client.send_message(user_id, "Failed to export the file. Please contact the developers for assistance.")
+
+
+async def delete_all_records(event, user_id):
+    """Handles deleting all user records."""
+    operator: Operator = Operator(user_id)
+    await asyncio.to_thread(operator.flush_data)
+    await handle_edit_respond(event, text="All your data has been deleted.", rewrite=True)
+    await show_start_menu(event, user_id, rewrite=False)
+
+
+async def delete_user(event, user_id):
+    """Handles deleting all user records."""
+    operator: Operator = Operator(user_id)
+    await asyncio.to_thread(operator.del_info)
+    await handle_edit_respond(
+        event=event,
+        text="All your data has been deleted, "
+             "and you have been successfully unsubscribed.",
+        rewrite=True
+    )
+
+
+async def default_handler(event, user_id):
+    """Handles unexpected states."""
+    logger.warning(f"Unexpected state for user {user_id}")
+    await event.respond("⚠️ Please read /help and use /start command to get the main menu.")
+    # await show_start_menu(event, user_id, rewrite=False)
+
+
+# noinspection PyTypeChecker
+@client.on(events.NewMessage)
+async def throttle_filter_text(event):
+    """
+    Throttle filter for all incoming messages.
+
+    Args:
+        event (telethon.events.NewMessage.Event): The incoming event.
+
+    Returns:
+        None: The function either stops propagation or forwards the event.
+    """
+    user_id = event.sender_id
+    #  Throttling (antispam)
+    if await is_throttled(user_id, "text"):
+        await event.respond("⏳ Too many actions! Please wait a moment.")
+        raise StopPropagation
+
+
+# noinspection PyTypeChecker
+@client.on(events.CallbackQuery)
+async def throttle_filter_callback(event):
+    """
+    Throttle filter for all CallbackQuery events.
+
+    Args:
+        event (telethon.events.CallbackQuery.Event): The incoming event.
+
+    Returns:
+        None: The function either stops propagation or forwards the event.
+    """
+    user_id = event.sender_id
+
+    #  Throttling (antispam)
+    if await is_throttled(user_id, "callback"):
+        await event.answer("⏳ Too many actions! Please wait a moment.", alert=True)
+        raise StopPropagation
+
+
+# noinspection PyTypeChecker
+@client.on(events.CallbackQuery(
+    pattern=get_menu_pattern('start')))
+async def handle_start_menu_callback(event):
+    """
+    Handles start menu button clicks in the Telegram bot menu.
+
+    Args:
+        event (telethon.events.CallbackQuery.Event): The event triggered by a button press.
+
+    Returns:
+        None
+    """
+
+    user_id = event.sender_id
+
+    if user_id not in user_data:
+        await init_user(user_id)
+
+    callback = event.data.decode("utf-8")
+
+    # keeping state for the user
+    user_data[user_id]['state'] = callback
+
+    match callback:
+        case "add_record":
+            await show_record_menu(event, user_id)
+        case "update_record_by_id":
+            await request_id(event, user_id)
+        case "delete_record_by_id":
+            await request_id(event, user_id)
+        case "import_csv":
+            await request_csv(event, user_id)
+        case "export_csv":
+            await handle_export_csv(event, user_id)
+        case "delete_all_records":
+            await delete_all_records(event, user_id)
+        case "delete_user":
+            await delete_user(event, user_id)
+        case _:
+            logger.error(f"Unexpected callback: {callback}")
+    raise StopPropagation
+
+
+@client.on(events.CallbackQuery(data=b"confirm_data"))
+async def handle_confirm_data_callback(event):
+    """
+    Handles confirm_data button clicks in the Telegram bot menu.
+    Args:
+        event (telethon.events.CallbackQuery.Event): The event triggered by a button press.
+
+    Returns:
+        None
+    """
+    user_id = event.sender_id
+    await handle_confirm_data(event, user_id)
+    raise StopPropagation
+
+
+@client.on(events.CallbackQuery(data=b"birth_date"))
+async def handle_birth_day_callback(event):
+    """
+    Handles birth_date button clicks in the Telegram bot menu.
+    Args:
+        event (telethon.events.CallbackQuery.Event): The event triggered by a button press.
+
+    Returns:
+        None
+    """
+    choice = event.data.decode("utf-8")
+    user_id = event.sender_id
+    prompt = get_prompt_from_config(choice, CONFIG.TELETHON_API.menu)
+    prompt = f"Send me {prompt}"
+    prompt += "\nFormat: dd/mm/yyyy (e.g. 01/03/2000)"
+    await ask_for_input(event, user_id, "birth_date", prompt)
+    raise StopPropagation
+
+
+@client.on(
+    events.CallbackQuery(
+        pattern=pattern_from_list(
+            ["company", "position", "gift_category",
+             "first_name", "last_name", "notice_before_days"]
+        )))
+async def handle_record_menu_callback(event):
+    """
+    Handles record fields entry button clicks in the Telegram bot menu.
+    Args:
+        event (telethon.events.CallbackQuery.Event): The event triggered by a button press.
+
+    Returns:
+        None
+    """
+    user_id = event.sender_id
+    choice = event.data.decode("utf-8")
+    prompt = get_prompt_from_config(choice, CONFIG.TELETHON_API.menu)
+    prompt = f"Send me {prompt}"
+    await ask_for_input(event, user_id, choice, prompt)
+    raise StopPropagation
 
 
 @client.on(events.NewMessage(pattern="/start"))
 async def start(event):
-    """Handles the /start command and shows the main menu."""
+    """Handles the /start command and shows the main menu.
+
+    Args:
+        event (telethon.events.NewMessage.Event): The event triggered by a button press.
+
+    Returns:
+        None
+    """
     user_id = event.sender_id
+
     await init_user(user_id)
     await show_start_menu(event, user_id)
+    raise StopPropagation
+
 
 @client.on(events.NewMessage(pattern="/help"))
 async def help_command(event):
     """Handles the /help command and sends the help message."""
     await event.respond(CONFIG.MSG.help)
+    raise StopPropagation
 
 
-# noinspection PyTypeChecker
-@client.on(events.CallbackQuery)
-async def handle_callback(event):
-    """
-    Handles button clicks in the Telegram bot menu.
-
-    This function processes user interactions with the bot's inline keyboard
-    and updates the user's state accordingly. It supports operations such as:
-    - Adding, updating, and deleting records by ID.
-    - Importing and exporting CSV data.
-    - Managing user input for various parameters.
-    - Navigating between menu sections.
-
-    Depending on the button pressed, the function may request additional input
-    from the user or execute a predefined operation.
-
-    Args:
-        event (telethon.events.CallbackQuery.Event):
-            The event triggered by a button press.
-
-    Returns:
-        None: This function interacts with the user via messages but does not return a value.
-    """
-
-    user_id = event.sender_id
-    if user_id not in user_data:
-        await init_user(user_id)
-
-    data = event.data.decode('utf-8')
-    operator: Operator = Operator(user_id)
-
-    match data:
-
-        # Start menu 1st level
-        case "add_record":
-            user_data[user_id]['state'] = "add_record_state"
-            await show_add_record_menu(event, user_id)
-
-        case "back_to_start":
-            await show_start_menu(event, user_id)
-
-        case "update_record_by_id":
-            user_data[user_id]['state'] = "update_record_by_id_state"
-
-            await ask_for_input(
-                event,
-                user_id,
-                'record_id',
-                "Enter the ID of the record you want to edit."
-            )
-
-        case "delete_record_by_id":
-            user_data[user_id]['state'] = "delete_record_by_id_state"
-
-            await ask_for_input(
-                event,
-                user_id,
-                'record_id',
-                "Enter the ID of the record you want to delete."
-            )
-
-        case "import_csv":
-            user_data[user_id]['state'] = "import_csv_state"
-            await ask_for_input(
-                event,
-                user_id,
-                'import_csv',
-                CONFIG.MSG.help_import
-            )
-
-        case "export_csv":
-            user_data[user_id]['state'] = "export_csv_state"
-
-            file = await asyncio.to_thread(operator.export_data)
-            if file:
-                caption = "Here is your data file in CSV format."
-                await client.send_file(event.chat_id, file, caption=caption)
-                await asyncio.to_thread(operator.remove_tmp_file, file)
-            else:
-                caption = "Failed to export the file. Please contact the developers for assistance."
-                await client.send_message(user_id, caption)
-
-        case "delete_all_records":
-            await asyncio.to_thread(operator.flush_data)
-            await event.edit("All your data has been deleted.")
-            await show_start_menu(event, user_id, rewrite=False)
-
-        case "delete_user":
-            await asyncio.to_thread(operator.del_info)
-            await event.edit("All your data has been deleted, and you have been successfully unsubscribed.")
-
-        # Data entry menu 2nd level
-        case "birth_date" as choice:
-            prompt = get_prompt_from_config(choice, CONFIG.TELETHON_API.menu)
-            prompt = f"Enter {prompt}"
-            prompt += "\nFormat: dd/mm/yyyy (e.g. 01/03/2000)"
-            await ask_for_input(event, user_id, "birth_date", prompt)
-
-        case "company" | "position" | "gift_category" | "first_name" | \
-             "last_name" | "notice_before_days" as choice:
-            prompt = get_prompt_from_config(choice, CONFIG.TELETHON_API.menu)
-            prompt = f"Enter {prompt}"
-            await ask_for_input(event, user_id, choice, prompt)
-
-        case "confirm_data":
-            is_valid = await validate_record(event, user_id)
-            if not is_valid:
-                return
-
-            match user_data[user_id].get('state'):
-                case "add_record_state":
-                    try:
-                        caption = await asyncio.to_thread(
-                            operator.add_record, **user_data[user_id]['params']
-                        )
-                    except Exception as e:
-                        logger.error(f"Error adding record: {e}")
-                        caption = UNEXPECTED_ERROR_CAPTION
-
-                case "update_record_by_id_state":
-                    try:
-                        caption = await asyncio.to_thread(
-                            operator.update_record_by_id, **user_data[user_id]['params']
-                        )
-                    except Exception as e:
-                        logger.error(f"Error updating record: {e}")
-                        caption = UNEXPECTED_ERROR_CAPTION
-
-                case _:
-                    logger.error(f"Unexpected state: {user_data[user_id].get('state')}")
-                    caption = UNEXPECTED_ERROR_CAPTION
-
-            await client.send_message(user_id, caption)  # Всегда отправляем сообщение
-            await show_start_menu(event, user_id, rewrite=False)  # Всегда показываем меню
-
-        # The below section target is to be used with handle_data_entry function
-        # if we need to ask the user to confirm his choice
-        # case "accept_input":
-        #     await show_add_record_menu(event, user_id)
-
-        # case "cancel_input":
-        #     param_name = user_data[user_id].get('waited_param_name')
-        #     if param_name:
-        #         user_data[user_id]['params'].pop(param_name, None)  # Remove current input
-        #     await ask_for_input(event, user_id, param_name, f"Enter {param_name} again:")
-
-
-# noinspection PyTypeChecker
-@client.on(events.NewMessage)
+@client.on(events.NewMessage())
 async def handle_text(event):
     """
-    Handles user text input at all menu levels based on the current state.
-
-    This function determines the user's current state and processes the input accordingly.
-    It manages data entry for adding and updating records, handles CSV import,
-    and processes record deletions.
+    Handles user text input at all menu levels.
 
     Args:
-        event (telethon.events.NewMessage.Event): The event triggered by a user's text message.
+        event (telethon.events.NewMessage.Event):
+        The event triggered by a user's text message.
 
     Returns:
-        None: The function processes user input and updates the state without returning a value.
+        None
     """
+
     user_id = event.sender_id
 
     if user_id not in user_data:
         await init_user(user_id)
 
-    operator: Operator = Operator(user_id)
-
     match user_data[user_id]['state']:
-        case 'add_record_state' if 'waited_param_name' in user_data[user_id]:
-            waited_param_name = user_data[user_id].pop('waited_param_name', None)
-            user_data[user_id]['params'][waited_param_name] = event.raw_text
-            await show_add_record_menu(event, user_id)
-
-        case 'update_record_by_id_state' if 'waited_param_name' in user_data[user_id]:
-            waited_param_name = user_data[user_id].pop('waited_param_name', None)
-            user_data[user_id]['params'][waited_param_name] = event.raw_text
-            await show_add_record_menu(event, user_id)
-
-        case 'delete_record_by_id_state':
-            record_id = event.raw_text
-            caption = await asyncio.to_thread(operator.delete_record_by_id, record_id)
-            await client.send_message(event.chat_id, caption)
-            await show_start_menu(event, user_id, rewrite=False)
-
-        case 'import_csv_state':
-            response = await save_csv_file(event, user_id)
-            msg = await event.respond(response)
-            file = user_data[user_id]['params'].get('csv')
-
-            if file:
-                text = await asyncio.to_thread(operator.import_data, file)
-                event = await msg.respond(text)
-                await show_start_menu(event, user_id, rewrite=False)
-
-        case 'export_csv_state':
-            # Export CSV is handled via CallbackQuery
-            pass
-
-        case 'delete_user_state':
-            # User deletion is handled via CallbackQuery
-            pass
-
+        case "add_record":
+            await handle_waited_param(event=event, user_id=user_id)
+        case "update_record_by_id":
+            await handle_waited_param(event=event, user_id=user_id)
+        case "delete_record_by_id":
+            await handle_delete_record(event=event, user_id=user_id)
+        case "import_csv":
+            await handle_import_csv(event=event, user_id=user_id)
         case _:
-            # Default case: No action required
-            pass
-
+            await default_handler(event=event, user_id=user_id)
 
 async def run_tg_bot():
     """

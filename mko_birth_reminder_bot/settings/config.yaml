@@ -63,6 +63,10 @@
         [ { "birth_date": "Date of Birth" }, { "notice_before_days": "Notify Before (Days)" } ],
         [ { "confirm_data": "Confirm" } ],
       ]
+    },
+    "throttle_limits": {
+      "callback": [5, 10],  # press buttons limit
+      "text": [5, 10],  # send msg limit
     }
   },
   "REMINDER": {
