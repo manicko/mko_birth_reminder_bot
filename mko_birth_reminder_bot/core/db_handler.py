@@ -1,4 +1,6 @@
 import sqlite3
+# import psycopg2
+import threading
 from typing import List, Tuple, Optional, Any, Dict, Literal, Union
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -10,33 +12,51 @@ from .errors import *
 
 logger = logging.getLogger(__name__)
 
-def db_connect() -> sqlite3.Connection:
+
+class DBHandler:
     """
-    Establishes a connection to the SQLite database.
-
-    Returns:
-        sqlite3.Connection: Database connection.
+    Thread-safe Singleton for managing SQLite/PostgresSQL connections.
     """
-    try:
-        db_settings = CONFIG.DATABASE
-        db_file = Path(db_settings.path, db_settings.db_file)
-        db_con = sqlite3.connect(db_file, check_same_thread=False)
-        db_con.row_factory = sqlite3.Row
 
-        # Allows using the connection in multiple threads
-        db_con.execute("PRAGMA journal_mode=WAL;")  # Improves multithreaded access
-        db_con.execute("PRAGMA synchronous=NORMAL;")
-        db_con.execute("PRAGMA foreign_keys=ON;")
-        logging.info("Database initialized.")
+    _instance = None
+    _lock = threading.Lock()
 
-        return db_con
-    except sqlite3.Error as e:
-        logger.error(f"Database connection error: {e}")
-        raise e
+    def __new__(cls, db_type="sqlite", db_path=None, pg_config=None):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(DBHandler, cls).__new__(cls)
+                cls._instance._init_db(db_type, db_path, pg_config)
+        return cls._instance
+
+    def _init_db(self, db_type, db_path, pg_config):
+        """Initializes the database connection."""
+        self.logger = logging.getLogger(__name__)
+
+        if db_type == "sqlite":
+            self.db_con = sqlite3.connect(db_path, check_same_thread=False)
+            self.db_con.row_factory = sqlite3.Row
+            self.db_con.execute("PRAGMA journal_mode=WAL;")
+            self.db_con.execute("PRAGMA synchronous=NORMAL;")
+            self.db_con.execute("PRAGMA foreign_keys=ON;")
+            self.logger.info("SQLite initialized.")
+
+        elif db_type == "postgresql":
+            pass
+            # self.db_con = psycopg2.connect(**pg_config)
+            # self.logger.info("PostgresSQL initialized.")
+
+    def close(self):
+        """Closes the database connection."""
+        if self.db_con:
+            self.db_con.close()
+            self.logger.info("Database closed.")
 
 
-# Global database connection
-DB_CONNECTION = db_connect()
+db_settings = CONFIG.DATABASE
+db_file = Path(db_settings.path, db_settings.db_file)
+db_sqlite = DBHandler(db_type="sqlite", db_path=db_file)
+# db_pg = DBHandler(db_type="postgresql", pg_config={"dbname": "test", "user": "admin"})
+DB_CONNECTION = db_sqlite.db_con  # Global database connection
 
 
 class DBHandler:
