@@ -520,7 +520,7 @@ class TGUser(DBHandler):
     def __init__(self, tg_user_id: int):
         super().__init__()
         self.date_format = self.db_settings.date_format
-        self._tg_user_id = int(tg_user_id)
+        self.tg_user_id = tg_user_id
         self._info = self.get_info()
         self.is_exist = False
         if self._info:
@@ -534,6 +534,13 @@ class TGUser(DBHandler):
     @property
     def tg_user_id(self):
         return self._tg_user_id
+
+    @tg_user_id.setter
+    def tg_user_id(self, value):
+        try:
+            self._tg_user_id = int(value)
+        except ValueError as err:
+            self.logger.error(f"Invalid value for tg_user_id: {err}")
 
     @property
     def notify_before_days(self):
@@ -564,7 +571,7 @@ class TGUser(DBHandler):
             return None
 
         query = f"SELECT {field_name} FROM {TGUsers.TABLE_NAME} WHERE tg_user_id = ?"
-        result = self.perform_query(query, (self._tg_user_id,), fetch='one')
+        result = self.perform_query(query, (self.tg_user_id,), fetch='one')
         return result[field_name]
 
     def _update_field(self, field_name: str, field_value: Any) -> None:
@@ -579,7 +586,7 @@ class TGUser(DBHandler):
             self.logger.error(f"Попытка обновить недопустимое поле: {field_name}")
             return None
         query = f"""UPDATE {TGUsers.TABLE_NAME} SET {field_name} = ? WHERE tg_user_id = ?"""
-        return self.perform_query(query, (field_value, self._tg_user_id), fetch=None)
+        return self.perform_query(query, (field_value, self.tg_user_id), fetch=None)
 
     def update_last_interaction_date(self):
         self._last_interaction_date = datetime.now().strftime(self.date_format)
@@ -595,7 +602,7 @@ class TGUser(DBHandler):
                      (tg_user_id, last_interaction_date, notify_before_days)
                      VALUES (?, ?, ?)
                 """
-        self.perform_query(query, (self._tg_user_id, self.last_interaction_date, self.notify_before_days))
+        self.perform_query(query, (self.tg_user_id, self.last_interaction_date, self.notify_before_days))
         self.add_data_table()
 
     def get_info(self) -> Optional[Union[List[sqlite3.Row], sqlite3.Row]]:
@@ -604,13 +611,13 @@ class TGUser(DBHandler):
         :return: Кортеж с данными строки, если строка найдена. None, если строки нет.
         """
         query = f"SELECT * FROM {TGUsers.TABLE_NAME} WHERE tg_user_id = ?"
-        return self.perform_query(query, (self._tg_user_id,), fetch='one')
+        return self.perform_query(query, (self.tg_user_id,), fetch='one')
 
     def add_data_table(self):
         """
         Добавляет в базу таблицу для загрузки данных пользователя.
        """
-        self.create_table(f'id_{str(self._tg_user_id)}', self.db_settings.columns)
+        self.create_table(f'id_{str(self.tg_user_id)}', self.db_settings.columns)
 
     def del_info(self):
         """
@@ -618,8 +625,8 @@ class TGUser(DBHandler):
          а также удаляет связанную с ним таблицу с данными
        """
         query = f"DELETE FROM {TGUsers.TABLE_NAME} WHERE tg_user_id = ?"
-        self.perform_query(query, (self._tg_user_id,), fetch='one')
-        self.drop_table(f'id_{str(self._tg_user_id)}')
+        self.perform_query(query, (self.tg_user_id,), fetch='one')
+        self.drop_table(f'id_{str(self.tg_user_id)}')
 
     def __del__(self):
         self.update_last_interaction_date()
