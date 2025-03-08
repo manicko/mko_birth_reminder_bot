@@ -7,6 +7,7 @@ from mko_birth_reminder_bot.core.utils import (rows_to_dict_list)
 from .test_data import TestData
 import mko_birth_reminder_bot.core.errors as errors
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 
 class TestConfig:
@@ -240,10 +241,75 @@ class TestTGUser:
             pytest.fail(f"Fail to del_info: {e}")
 
 
+@pytest.mark.asyncio(scope="class")
 class TestQFetch:
-    @pytest.mark.asyncio(loop_scope="module")
+
     async def test_fetch_quote(self, quote_fetcher):
+        """Test get real quote"""
         q = await quote_fetcher.get_random_quote()
         print(q)
         assert q is not None
         assert len(q) > 0
+
+
+    async def test_get_random_quote_allowed(self, quote_fetcher):
+        """Mock test get allowed author quote."""
+        mock_session = AsyncMock()
+        response_mock = AsyncMock()
+        response_mock.status = 200
+        response_mock.text = AsyncMock(return_value="""
+            <html>
+                <h1 data-quote-content="true">Жизнь — это путешествие.</h1>
+                <div class="blockquote-origin"><a>Толстой</a></div>
+            </html>
+        """)
+
+        mock_session.get.return_value = response_mock
+        quote_fetcher.session = mock_session
+        quote = await quote_fetcher.get_random_quote()
+        assert quote == "Жизнь — это путешествие. — Толстой"
+
+    async def test_get_random_quote_banned(self, quote_fetcher):
+        """Mock test get not allowed author quote. Second trial required."""
+
+        mock_session = AsyncMock()
+        response_mock = AsyncMock()
+        response_mock.status = 200
+        response_mock.text = AsyncMock(side_effect=[
+            """
+            <html>
+                <h1 data-quote-content="true">Вдохновение существует.</h1>
+                <div class="blockquote-origin"><a>Степан Андреевич Бандера</a></div>
+            </html>
+            """,
+            """
+            <html>
+                <h1 data-quote-content="true">Жизнь — это путешествие.</h1>
+                <div class="blockquote-origin"><a>Толстой</a></div>
+            </html>
+            """
+        ])
+
+        mock_session.get.return_value = response_mock
+        quote_fetcher.session = mock_session
+        quote = await quote_fetcher.get_random_quote()
+
+        assert quote == "Жизнь — это путешествие. — Толстой"
+
+    async def test_get_random_quote_banned_five_times(self, quote_fetcher):
+        """Mock test if 5 times not allowed author quote. `None` should be returned"""
+        mock_session = AsyncMock()
+        response_mock = AsyncMock()
+        response_mock.status = 200
+        response_mock.text = AsyncMock(return_value="""
+            <html>
+                <h1 data-quote-content="true">Вдохновение существует.</h1>
+                <div class="blockquote-origin"><a>Адольф Гитлер</a></div>
+            </html>
+        """)
+
+        mock_session.get.return_value = response_mock
+        quote_fetcher.session = mock_session
+        quote = await quote_fetcher.get_random_quote()
+
+        assert quote is None

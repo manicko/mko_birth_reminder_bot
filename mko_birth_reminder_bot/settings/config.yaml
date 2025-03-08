@@ -65,9 +65,20 @@
       ]
     },
     "throttle_limits": {
-      "callback": [5, 10],  # press buttons limit
-      "text": [5, 10],  # send msg limit
+      "callback": [ 5, 10 ],  # press buttons limit
+      "text": [ 5, 10 ],  # send msg limit
     }
+  },
+  QUOTES: {
+    "send_quotes": True,
+    "banned_authors": [
+      "Муссолини",
+      "Роммель",
+      "Пиночет",
+      "Бандера",
+      "Гитлер",
+      "Сталин"
+    ]
   },
   "REMINDER": {
     "timezone": "Europe/Moscow",

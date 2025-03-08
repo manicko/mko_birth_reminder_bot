@@ -20,7 +20,7 @@ TIMEZONE = CONFIG.REMINDER.timezone
 TRIGGER_ARGS = CONFIG.REMINDER.trigger
 COLUMNS_TO_SEND = CONFIG.REMINDER.columns_to_send
 scheduler: AsyncIOScheduler | None = None
-
+SEND_QUOTES = CONFIG.QUOTES.send_quotes
 
 def save_state(last_run: datetime) -> None:
     """
@@ -88,7 +88,7 @@ async def generate_msgs(queue: asyncio.Queue, date: Union[datetime, None] = None
             data = user_data.get_all_reminders(date=date)
             msg = beautify_table(data)
 
-            if msg is None:
+            if SEND_QUOTES and msg is None:
                 msg = await q_fetcher.get_random_quote()
                 await asyncio.sleep(randint(1, 3))
             if msg:

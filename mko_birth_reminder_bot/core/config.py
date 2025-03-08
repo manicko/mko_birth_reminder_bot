@@ -38,9 +38,15 @@ class WorkingPaths(BaseSettings):
 
 PATHS = WorkingPaths()
 
+# Messages for default commands
 class Messages(BaseModel):
     help:str = ''
     help_import:str = ''
+
+# Messages for default commands
+class Quotes(BaseModel):
+    send_quotes:bool = True
+    banned_authors:list = []
 
 # Database settings
 class DatabaseSettings(BaseModel):
@@ -163,6 +169,7 @@ class Config(BaseSettings):
     REMINDER: ReminderSettings
     LOGGING: LoggingSettings
     MSG: Messages
+    QUOTES: Quotes
 
     model_config = {
         "env_prefix": "APP_",
@@ -189,4 +196,3 @@ class Config(BaseSettings):
 
 # Load the final configuration
 CONFIG = Config.load()
-

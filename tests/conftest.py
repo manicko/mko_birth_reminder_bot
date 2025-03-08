@@ -10,6 +10,7 @@ from typing import List, Dict
 from .test_data import TestData
 
 
+
 @pytest.fixture(scope="class")
 def config():
     return CONFIG
@@ -115,7 +116,7 @@ def cleanup_temp_files(config):
     if target_output.is_file():
         target_output.unlink()
 
-@pytest_asyncio.fixture(loop_scope="module")
+@pytest_asyncio.fixture(loop_scope="class")
 async def quote_fetcher():
     async with QuoteFetcher() as f:
         yield f
